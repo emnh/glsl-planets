@@ -1,0 +1,18 @@
+{
+  "name": "glsl-planets",
+  "version": "0.0.1",
+  "repository" : {
+    "type" : "git",
+    "url" : "http://github.com/emnh/glsl-planets.git"
+  },
+  "dependencies": {
+    "browserify": "*",
+    "babelify": "*"
+  },
+  "engines": {
+    "node": "0.10.x",
+    "npm": "2.3.x"
+  },
+  "scripts": {
+  }
+}
