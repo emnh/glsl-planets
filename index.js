@@ -12,7 +12,7 @@ var speed_reduction = 1.0;
 var star_speed_reduction = 0.01;
 var minDist = 0.001;
 var trailLength = 1;
-var starTrailLength = 3;
+var starTrailLength = 1;
 var randomWalk = true;
 var debugCompute = false;
 
@@ -233,42 +233,44 @@ var MeshMaker = function(shader) {
   //this.geometry = new THREE.BoxGeometry( 1/scale, 1/scale, 1/scale );
   //this.geometry = new THREE.TorusGeometry(0.5/scale, 0.25/scale, 16, 100);
   this.geometry = new THREE.SphereGeometry( 0.03, 50, 50);
-  //this.geometry = new THREE.SphereGeometry( 70, 50, 50);
+  //this.geometry = new THREE.SphereGeometry( 0.3, 50, 50);
   //this.geometry = new THREE.IcosahedronGeometry(0.1);
-  
-  this.initShader = function() {
-    this.shaderMaterial = new THREE.ShaderMaterial({
-      uniforms: {
-        time: { type: "f", value: 0.0 },
-        resolution: { type: "v2", value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-        color: { type: "c", value: new THREE.Color(1.0, 1.0, 1.0) }
-      },
-      vertexShader:   $('#vertexshader').text(),
-      fragmentShader: shader,
-      transparent: true
-    });
-  }
-
+ 
   this.initMaterial = function() {
     var imgTexture = THREE.ImageUtils.loadTexture( "textures/lavatile.jpg");
     imgTexture.repeat.set( 4, 2 );
     imgTexture.wrapS = imgTexture.wrapT = THREE.RepeatWrapping;
     imgTexture.anisotropy = 16;
+    this.imgTexture = imgTexture;
 
     var shininess = 50, specular = 0x333333, bumpScale = 1, shading = THREE.SmoothShading;
     
     var imgTexture2 = THREE.ImageUtils.loadTexture( "textures/moon_1024.jpg");
     imgTexture2.wrapS = imgTexture2.wrapT = THREE.RepeatWrapping;
     imgTexture2.anisotropy = 16;
+    this.imgTexture2 = imgTexture2;
     
-    this.material = new THREE.MeshPhongMaterial( { map: imgTexture, bumpMap: imgTexture, bumpScale: bumpScale, color: 0xffffff, specular: specular, shininess: shininess, shading: shading } );
+    this.material = new THREE.MeshPhongMaterial( { map: imgTexture2, bumpMap: imgTexture, bumpScale: bumpScale, color: 0xffffff, specular: specular, shininess: shininess, shading: shading } );
   };
 
   this.initMaterial();
+ 
+  this.initShader = function() {
+    this.shaderMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        time: { type: "f", value: 0.0 },
+        resolution: { type: "v2", value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+        color: { type: "c", value: new THREE.Color(1.0, 1.0, 1.0) },
+        material: { type: "t", value: this.imgTexture }
+      },
+      vertexShader:   $('#vertexshader').text(),
+      fragmentShader: shader,
+      transparent: true
+    });
+  }
   
   this.createMesh = function() {  
     var mesh = new THREE.Mesh( this.geometry, this.shaderMaterial );
-    //this.material = new THREE.MeshBasicMaterial({ color: 0xffffff });
     //var mesh = new THREE.Mesh( this.geometry, this.material );
     return mesh;
   };
@@ -363,13 +365,16 @@ var meshMaker1 = new MeshMaker(shader);
 //meshMakers.push(meshMaker1);
 var shader2 = $('#fragmentshader2').text();
 var meshMaker2 = new MeshMaker(shader2);
-meshMakers.push(meshMaker2);
+//meshMakers.push(meshMaker2);
 var shader3 = $('#fragmentshader3').text();
 var meshMaker3 = new MeshMaker(shader3);
 //meshMakers.push(meshMaker3);
 var shader4 = $('#fragmentshader4').text();
 var meshMaker4 = new MeshMaker(shader4);
 //meshMakers.push(meshMaker4);
+var shader5 = $('#fragmentshader5').text();
+var meshMaker5 = new MeshMaker(shader5);
+meshMakers.push(meshMaker5);
 
 for (var p of planets) {
   meshMakers[p.index % meshMakers.length].initShader();
@@ -387,6 +392,14 @@ for (var p of planets) {
     }
   }
 }
+scene.add(new THREE.AmbientLight(0x444444));
+
+var directionalLight = new THREE.DirectionalLight( 0xffffff, 1 );
+directionalLight.position.set( 0.5, 0.5, 0.5 ).normalize();
+scene.add( directionalLight );
+
+var pointLight = new THREE.PointLight( 0xffffff, 2, 800 );
+scene.add( pointLight );
 
 var startTime = (new Date().getTime()) / 1000.0 - 500.0;
 
@@ -522,9 +535,10 @@ var render = function() {
 
       var mesh = p.meshes[t];
       
-      mesh.rotation.x = p.velocity.x*360;
-      mesh.rotation.y = p.velocity.y*360;
-      mesh.rotation.z = p.velocity.z*360;
+      var rmul = 360.0;
+      mesh.rotation.x = p.velocity.x*rmul;
+      mesh.rotation.y = p.velocity.y*rmul;
+      mesh.rotation.z = p.velocity.z*rmul;
 
       var position = p.position; //s[t];
       var starScale = 15.0;
