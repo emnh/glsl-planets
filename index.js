@@ -9,17 +9,34 @@ var maxSpeed = 0.01;
 var minSpeed = 0.001;
 var dist_reduction = 1.0e5;
 var speed_reduction = 1.0;
-var star_speed_reduction = 0.01;
+var star_speed_reduction = 0.1;
 var minDist = 0.001;
-var trailLength = 1;
+var trailLength = 200;
 var starTrailLength = 1;
+var memorizeGeometry = true;
 var randomWalk = true;
 var debugCompute = false;
+var useBackBuffer = false;
+var useShader = true;
+var useTubes = false;
+var tubeSegments = 20;
+
+var SCALE = 20;
+var maxX = 1.0 * SCALE / 2.0 * window.innerWidth / window.innerHeight;
+var maxY = 1.0 * SCALE / 2.0;
+var maxZ = 1.0 * SCALE;
 
 var scene = new THREE.Scene();
 var camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
-var SCALE = 10;
 camera.position.z = SCALE;
+
+var stats = new Stats();
+stats.domElement.style.position = 'absolute';
+stats.domElement.style.top = '0px';
+var container = document.getElementById( 'statsContainer' );
+container.appendChild( stats.domElement );
+
+var controls = new THREE.OrbitControls(camera);
 
 var screenScene = new THREE.Scene();
 var screenCamera = new THREE.PerspectiveCamera( 100, window.innerWidth/window.innerHeight, 0.1, 1000 ); 
@@ -229,11 +246,18 @@ var ComputeShader = function() {
 
 var MeshMaker = function(shader) {
   
-  var scale = 10.0;
+  var scale = 1.0;
   //this.geometry = new THREE.BoxGeometry( 1/scale, 1/scale, 1/scale );
   //this.geometry = new THREE.TorusGeometry(0.5/scale, 0.25/scale, 16, 100);
-  this.geometry = new THREE.SphereGeometry( 0.03, 50, 50);
-  //this.geometry = new THREE.SphereGeometry( 0.3, 50, 50);
+  //this.geometry = new THREE.SphereGeometry( 0.03, 50, 50);
+  this.geometry = new THREE.SphereGeometry( 0.3, 50, 50);
+  var length = 1.0;
+
+  //this.geometry = new THREE.CylinderGeometry( 0.3, 0.3, length, 50);
+  // rotates the cylinder to initial position so it will rotate correctly with velocity
+  //this.geometry.applyMatrix( new THREE.Matrix4().makeTranslation( 0, length / 2, 0 ) );
+  //this.geometry.applyMatrix( new THREE.Matrix4().makeRotationX( Math.PI / 2 ) );
+
   //this.geometry = new THREE.IcosahedronGeometry(0.1);
  
   this.initMaterial = function() {
@@ -250,7 +274,8 @@ var MeshMaker = function(shader) {
     imgTexture2.anisotropy = 16;
     this.imgTexture2 = imgTexture2;
     
-    this.material = new THREE.MeshPhongMaterial( { map: imgTexture2, bumpMap: imgTexture, bumpScale: bumpScale, color: 0xffffff, specular: specular, shininess: shininess, shading: shading } );
+    //this.material = new THREE.MeshPhongMaterial( { map: imgTexture, bumpMap: imgTexture, bumpScale: bumpScale, color: 0xffffff, specular: specular, shininess: shininess, shading: shading } );
+    this.material = new THREE.MeshPhongMaterial( { color: 0x2194ce, specular: 0x111111, shininess: 30 } );
   };
 
   this.initMaterial();
@@ -270,8 +295,11 @@ var MeshMaker = function(shader) {
   }
   
   this.createMesh = function() {  
-    var mesh = new THREE.Mesh( this.geometry, this.shaderMaterial );
-    //var mesh = new THREE.Mesh( this.geometry, this.material );
+    if (useShader) {
+      var mesh = new THREE.Mesh(this.geometry, this.shaderMaterial);
+    } else {
+      var mesh = new THREE.Mesh(this.geometry, this.material);
+    }
     return mesh;
   };
     
@@ -290,9 +318,9 @@ var createPlanet = function(index) {
       z: randInit()
     },
     velocity: {
-      x: 0,//randInit() * maxSpeed,
-      y: 0,//randInit() * maxSpeed,
-      z: 0//randInit() * maxSpeed
+      x: randInit() * maxSpeed,
+      y: randInit() * maxSpeed,
+      z: randInit() * maxSpeed
     },
     mass: Math.random(),
     radius: Math.random(),
@@ -358,48 +386,104 @@ for (var star of starPlanets) {
   planets.push(star);
 }
 
-//var meshes = [];
-var meshMakers = [];
-var shader = $('#fragmentshader1').text();
-var meshMaker1 = new MeshMaker(shader);
-//meshMakers.push(meshMaker1);
-var shader2 = $('#fragmentshader2').text();
-var meshMaker2 = new MeshMaker(shader2);
-//meshMakers.push(meshMaker2);
-var shader3 = $('#fragmentshader3').text();
-var meshMaker3 = new MeshMaker(shader3);
-//meshMakers.push(meshMaker3);
-var shader4 = $('#fragmentshader4').text();
-var meshMaker4 = new MeshMaker(shader4);
-//meshMakers.push(meshMaker4);
-var shader5 = $('#fragmentshader5').text();
-var meshMaker5 = new MeshMaker(shader5);
-meshMakers.push(meshMaker5);
+var createWalls = function() {
+  var planeGeo = new THREE.PlaneGeometry( SCALE*2.0 + 0.1, SCALE*2.0 + 0.1 );
 
-for (var p of planets) {
-  meshMakers[p.index % meshMakers.length].initShader();
-  if (p.isStar) {
-    for (var t = 0; t < starTrailLength; t++) {
-      var mesh = meshMakers[p.index % meshMakers.length].createMesh();
-      p.meshes.push(mesh);
-      scene.add(mesh);
-    }
-  } else {
-    for (var t = 0; t < trailLength; t++) {
-      var mesh = meshMakers[p.index % meshMakers.length].createMesh();
-      p.meshes.push(mesh);
-      scene.add(mesh);
+  var wallColor = 0x111111;
+
+  var planeTop = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
+  planeTop.position.y = maxY;
+  planeTop.rotateX( Math.PI / 2 );
+  scene.add( planeTop );
+
+  var planeBottom = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
+  planeBottom.position.y = -maxY;
+  planeBottom.rotateX( -Math.PI / 2 );
+  scene.add( planeBottom );
+  
+  var planeBack = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
+  planeBack.position.z = -maxZ;
+  planeBack.position.y = 0.0;
+  scene.add( planeBack );
+  
+  var planeFront = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
+  planeFront.position.z = maxZ;
+  planeFront.position.y = 0.0;
+  planeFront.rotateY( Math.PI );
+  scene.add( planeFront );
+  
+  var planeRight = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
+  planeRight.position.x = maxX;
+  planeRight.position.y = 0.0;
+  planeRight.rotateY( - Math.PI / 2 );
+  scene.add( planeRight );
+  
+  var planeLeft = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
+  planeLeft.position.x = -maxX;
+  planeLeft.position.y = 0.0;
+  planeLeft.rotateY( Math.PI / 2 );
+  scene.add( planeLeft );
+};
+
+var createScene = function() {
+  var meshMakers = [];
+  var shader = $('#fragmentshader1').text();
+  var meshMaker1 = new MeshMaker(shader);
+  //meshMakers.push(meshMaker1);
+  var shader2 = $('#fragmentshader2').text();
+  var meshMaker2 = new MeshMaker(shader2);
+  meshMakers.push(meshMaker2);
+  var shader3 = $('#fragmentshader3').text();
+  var meshMaker3 = new MeshMaker(shader3);
+  //meshMakers.push(meshMaker3);
+  var shader4 = $('#fragmentshader4').text();
+  var meshMaker4 = new MeshMaker(shader4);
+  //meshMakers.push(meshMaker4);
+  var shader5 = $('#fragmentshader5').text();
+  var meshMaker5 = new MeshMaker(shader5);
+  //meshMakers.push(meshMaker5);
+
+  for (var p of planets) {
+    meshMakers[p.index % meshMakers.length].initShader();
+    if (p.isStar) {
+      for (var t = 0; t < starTrailLength; t++) {
+        var mesh = meshMakers[p.index % meshMakers.length].createMesh();
+        p.meshes.push(mesh);
+        if (!useTubes) {
+          scene.add(mesh);
+        }
+      }
+    } else {
+      for (var t = 0; t < trailLength; t++) {
+        var mesh = meshMakers[p.index % meshMakers.length].createMesh();
+        p.meshes.push(mesh);
+        if (!useTubes) {
+          scene.add(mesh);
+        }
+      }
     }
   }
 }
-scene.add(new THREE.AmbientLight(0x444444));
 
-var directionalLight = new THREE.DirectionalLight( 0xffffff, 1 );
-directionalLight.position.set( 0.5, 0.5, 0.5 ).normalize();
-scene.add( directionalLight );
+var createLights = function() {
+  //scene.add(new THREE.AmbientLight(0x444444));
+  var mainLight = new THREE.PointLight( 0xffffff, 1.5, 250 );
+  mainLight.position.set(0.0, 0.0, maxZ);
+  scene.add(mainLight);
 
-var pointLight = new THREE.PointLight( 0xffffff, 2, 800 );
-scene.add( pointLight );
+  /*var directionalLight = new THREE.DirectionalLight( 0xffffff, 1 );
+  directionalLight.position.set( 0.5, 0.5, 0.5 ).normalize();
+  scene.add( directionalLight );*/
+
+  //var pointLight = new THREE.PointLight( 0xffffff, 2, 800 );
+  //scene.add( pointLight );
+};
+
+if (!useBackBuffer) {
+  createWalls();
+}
+createScene();
+createLights();
 
 var startTime = (new Date().getTime()) / 1000.0 - 500.0;
 
@@ -522,36 +606,92 @@ var updatePlanets = function() {
   }
 };
 
+var bigGeometry = new THREE.Geometry();
+var shader = $('#fragmentshader2').text();
+var meshMaker = new MeshMaker(shader);
+var bigMesh = new THREE.Mesh(bigGeometry, meshMaker.shaderMaterial);
+//scene.add(bigMesh);
+var renderCount = 0;
+var oldTubes = [];
+
 var render = function() {
+  renderCount += 1;
+  /*
+  if (renderCount % 1000 == 0) {
+    scene.remove(bigMesh);
+    bigGeometry = new THREE.Geometry();
+    bigMesh = new THREE.Mesh(bigGeometry, meshMaker.shaderMaterial);
+    scene.add(bigMesh);
+  }
+  */
   var i = 0;
   var newTime = (new Date().getTime()) / 1000.0;
   var timeVal = newTime - startTime;
   var sc = (Math.sin(timeVal) + 1.0) * 20.0 + 10.0;
   //camera.position.z = sc;
-  camera.rotation.z = Math.sin(timeVal)*0.1;
+  //camera.rotation.z = Math.sin(timeVal)*0.1;
+  //var newGeometry = new THREE.Geometry();
+  //scene.add(newGeometry);
+  for (var tube of oldTubes) {
+    scene.remove(tube);
+    //tube.dispose();
+    tube.geometry.dispose();
+    //material.dispose();
+    //texture.dispose();
+  }
+  oldTubes = [];
   for (var p of planets) {
     if (p.positions.length > 0) {
       var t = p.lastMesh;
-
       var mesh = p.meshes[t];
-      
-      var rmul = 360.0;
-      mesh.rotation.x = p.velocity.x*rmul;
-      mesh.rotation.y = p.velocity.y*rmul;
-      mesh.rotation.z = p.velocity.z*rmul;
 
-      var position = p.position; //s[t];
-      var starScale = 15.0;
-      if (p.isStar) {
-        position = {
-          x: position.x / starScale + p.parent.position.x,
-          y: position.y / starScale + p.parent.position.y,
-          z: position.z / starScale + p.parent.position.z
+      var mapPositionToScene = function(position) {
+        var starScale = 5.0*SCALE;
+        if (p.isStar) {
+          position = {
+            x: position.x / starScale + p.parent.position.x,
+            y: position.y / starScale + p.parent.position.y,
+            z: position.z / starScale + p.parent.position.z
+          };
+        }
+        return {
+          x: position.x * maxX,
+          y: position.y * maxY,
+          z: position.z * maxZ
         };
+      };
+
+      var createTube = function() {
+        var path = [];
+        for (var pos of p.positions) {
+          pos = mapPositionToScene(pos);
+          var pos_vec3 = new THREE.Vector3(pos.x, pos.y, pos.z);
+          path.push(pos_vec3);
+        }
+        path = new THREE.SplineCurve3(path);
+        var geometry = new THREE.TubeGeometry(
+            path,  //path
+            tubeSegments,    //segments
+            0.3,     //radius
+            4,     //radiusSegments
+            false  //closed
+        );
+        var tube = new THREE.Mesh(geometry, mesh.material);
+        scene.add(tube);
+        oldTubes.push(tube);
+      };
+      if (useTubes) {
+        createTube();
       }
-      mesh.position.x = position.x*SCALE/2;
-      mesh.position.y = position.y*SCALE/2;
-      mesh.position.z = position.z*SCALE/2;
+
+      var pos = mapPositionToScene(p.position);
+      mesh.position.set(pos.x, pos.y, pos.z);
+      
+      var dir = new THREE.Vector3(
+                  mesh.position.x + p.velocity.x, 
+                  mesh.position.y + p.velocity.y,
+                  mesh.position.z + p.velocity.z);
+      mesh.lookAt(dir);
 
       var scale = 1.0 + p.radius * 0.0;
       mesh.scale.x = scale;
@@ -571,6 +711,9 @@ var render = function() {
                           color.b);
       }
       p.lastMesh = (p.lastMesh + 1) % p.meshes.length;
+
+      //mesh.updateMatrix();
+      //bigGeometry.merge(mesh.geometry, mesh.matrix);
     }
     
     i += 1;
@@ -579,11 +722,13 @@ var render = function() {
   //var planetsTexture = genTexture();
   //screenMaterial.uniforms.planetsTexture.value = planetsTexture;
 
-  //renderer.render(scene, camera);
-
-  renderer.render(scene, camera, rtScreen, true);
-  renderer.render(screenScene, screenCamera, null, false);
-  renderer.render(screenScene, screenCamera, rtBackBuffer1, false);
+  if (!useBackBuffer) {
+    renderer.render(scene, camera);
+  } else {
+    renderer.render(scene, camera, rtScreen, true);
+    renderer.render(screenScene, screenCamera, null, false);
+    renderer.render(screenScene, screenCamera, rtBackBuffer1, false);
+  }
   
   // swap buffers
   var a = rtBackBuffer2;
@@ -591,6 +736,7 @@ var render = function() {
   rtBackBuffer1 = a;
   screenMaterial.uniforms.backbuffer.value = rtBackBuffer2;
   
+  stats.update();
   requestAnimationFrame(render);
 };
 
