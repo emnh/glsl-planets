@@ -11,7 +11,7 @@ var dist_reduction = 1.0e5;
 var speed_reduction = 1.0;
 var star_speed_reduction = 0.1;
 var minDist = 0.001;
-var trailLength = 200;
+var trailLength = 100;
 var starTrailLength = 1;
 var memorizeGeometry = true;
 var randomWalk = true;
@@ -20,8 +20,13 @@ var useBackBuffer = false;
 var useShader = true;
 var useTubes = false;
 var tubeSegments = 20;
+var useParticles = false;
+var useMeshes = !useTubes && !useParticles;
+var maxParticles = 10000;
+var useParticleTrail = true;
 
 var SCALE = 20;
+var starScale = 1.0 / (1.0 * SCALE);
 var maxX = 1.0 * SCALE / 2.0 * window.innerWidth / window.innerHeight;
 var maxY = 1.0 * SCALE / 2.0;
 var maxZ = 1.0 * SCALE;
@@ -162,7 +167,6 @@ var ComputeShader = function() {
     var aOffset = 3;
     var b = new Uint8Array(tw*th*rs);
     for (var planet of planets) {
-      //if (planet.positions.length <= 0) continue;
       var i = planet.index * vec4PerPlanet * rs;
       var position = planet.position;
       var starScale = 15.0;
@@ -261,10 +265,10 @@ var MeshMaker = function(shader) {
   //this.geometry = new THREE.IcosahedronGeometry(0.1);
  
   this.initMaterial = function() {
-    var imgTexture = THREE.ImageUtils.loadTexture( "textures/lavatile.jpg");
-    imgTexture.repeat.set( 4, 2 );
-    imgTexture.wrapS = imgTexture.wrapT = THREE.RepeatWrapping;
-    imgTexture.anisotropy = 16;
+    var imgTexture = THREE.ImageUtils.loadTexture( "textures/sprite.png");
+    //imgTexture.repeat.set( 1, 1 );
+    //imgTexture.wrapS = imgTexture.wrapT = THREE.RepeatWrapping;
+    //imgTexture.anisotropy = 16;
     this.imgTexture = imgTexture;
 
     var shininess = 50, specular = 0x333333, bumpScale = 1, shading = THREE.SmoothShading;
@@ -325,9 +329,15 @@ var createPlanet = function(index) {
     mass: Math.random(),
     radius: Math.random(),
     positions: [],
+    maxPositions: trailLength,
     meshes: [],
     lastMesh: 0,
     color: {
+      r: Math.random(),
+      g: Math.random(),
+      b: Math.random()
+    },
+    color2: {
       r: Math.random(),
       g: Math.random(),
       b: Math.random()
@@ -368,6 +378,7 @@ for (var planet of planets) {
     star.radius = planet.radius * 0.5;
     star.mass = 1.0;
     star.isStar = true;
+    star.maxPositions = starTrailLength;
     theseStars.push(star);
     var w = 1.0;
     var edge = [star, planet, w];
@@ -425,7 +436,7 @@ var createWalls = function() {
   scene.add( planeLeft );
 };
 
-var createScene = function() {
+var createMeshes = function() {
   var meshMakers = [];
   var shader = $('#fragmentshader1').text();
   var meshMaker1 = new MeshMaker(shader);
@@ -442,14 +453,20 @@ var createScene = function() {
   var shader5 = $('#fragmentshader5').text();
   var meshMaker5 = new MeshMaker(shader5);
   //meshMakers.push(meshMaker5);
+  var shader6 = $('#fragmentshader6').text();
+  var meshMaker6 = new MeshMaker(shader6);
+  //meshMakers.push(meshMaker6);
 
   for (var p of planets) {
     meshMakers[p.index % meshMakers.length].initShader();
+    if (useTubes) {
+      p.tubeMaterial = meshMakers[p.index % meshMakers.length].shaderMaterial;
+    }
     if (p.isStar) {
       for (var t = 0; t < starTrailLength; t++) {
         var mesh = meshMakers[p.index % meshMakers.length].createMesh();
         p.meshes.push(mesh);
-        if (!useTubes) {
+        if (useMeshes) {
           scene.add(mesh);
         }
       }
@@ -457,7 +474,7 @@ var createScene = function() {
       for (var t = 0; t < trailLength; t++) {
         var mesh = meshMakers[p.index % meshMakers.length].createMesh();
         p.meshes.push(mesh);
-        if (!useTubes) {
+        if (useMeshes) {
           scene.add(mesh);
         }
       }
@@ -482,7 +499,9 @@ var createLights = function() {
 if (!useBackBuffer) {
   createWalls();
 }
-createScene();
+//if (!useParticles) {
+  createMeshes();
+//}
 createLights();
 
 var startTime = (new Date().getTime()) / 1000.0 - 500.0;
@@ -589,13 +608,15 @@ var updatePlanets = function() {
   // update positions
   for (var planet2 of planets) {
     // store old position
-    planet2.positions.push({
-      x: planet2.position.x,
-      y: planet2.position.y,
-      z: planet2.position.z
-    });
-    if (planet2.positions.length > planet2.meshes.length) {
-      planet2.positions.shift();
+    if (useTubes) {
+      planet2.positions.push({
+        x: planet2.position.x,
+        y: planet2.position.y,
+        z: planet2.position.z
+      });
+      if (planet2.positions.length > planet2.maxPositions) {
+        planet2.positions.shift();
+      }
     }
     
     // compute new
@@ -606,138 +627,206 @@ var updatePlanets = function() {
   }
 };
 
-var bigGeometry = new THREE.Geometry();
-var shader = $('#fragmentshader2').text();
-var meshMaker = new MeshMaker(shader);
-var bigMesh = new THREE.Mesh(bigGeometry, meshMaker.shaderMaterial);
-//scene.add(bigMesh);
-var renderCount = 0;
-var oldTubes = [];
+var Particles = function() {
+  var geometry = new THREE.Geometry();
+  var currentIndex = 0;
 
-var render = function() {
-  renderCount += 1;
-  /*
-  if (renderCount % 1000 == 0) {
-    scene.remove(bigMesh);
-    bigGeometry = new THREE.Geometry();
-    bigMesh = new THREE.Mesh(bigGeometry, meshMaker.shaderMaterial);
-    scene.add(bigMesh);
+  var material =
+    new THREE.ShaderMaterial({
+      uniforms: {
+        opacity: { type: 'f', value: 1.0 }
+      },
+      attributes: {
+        psize:  { type: 'f', value: [], needsUpdate: true },
+        pcolor: { type: 'c', value: [], needsUpdate: true },
+        pcolor2: { type: 'c', value: [], needsUpdate: true }
+      },
+      vertexShader: $("#vertexshaderParticles").text(),
+      fragmentShader: $("#fragmentshaderParticles").text(),
+      //blending: THREE.AdditiveBlending,
+      //blending: THREE.MultiplyBlending,
+      depthWrite: false,
+      transparent: true
+    });
+  //material = new THREE.PointCloudMaterial( { size: 35, sizeAttenuation: false, alphaTest: 0.5, transparent: true } );
+  var particleCloud = new THREE.PointCloud(geometry, material);
+
+  this.setOpacity = function(o) {
+    material.uniforms.opacity.value = o;
+  };
+
+  this.add = function(pt, size, color, color2) {
+    var vertices = geometry.vertices;
+    var idx = vertices.length;
+    if (vertices.length < maxParticles) {
+      vertices.push(pt);
+    } else {
+      geometry[currentIndex] = pt;
+      idx = currentIndex;
+      currentIndex = (currentIndex + 1) % maxParticles
+    }
+    var vsize = material.attributes.psize.value;
+    var vcolor = material.attributes.pcolor.value;
+    var vcolor2 = material.attributes.pcolor2.value;
+    vsize[idx] = size;
+    vcolor[idx] = color;
+    vcolor2[idx] = color2;
   }
-  */
-  var i = 0;
-  var newTime = (new Date().getTime()) / 1000.0;
-  var timeVal = newTime - startTime;
-  var sc = (Math.sin(timeVal) + 1.0) * 20.0 + 10.0;
-  //camera.position.z = sc;
-  //camera.rotation.z = Math.sin(timeVal)*0.1;
-  //var newGeometry = new THREE.Geometry();
-  //scene.add(newGeometry);
-  for (var tube of oldTubes) {
-    scene.remove(tube);
-    //tube.dispose();
-    tube.geometry.dispose();
-    //material.dispose();
-    //texture.dispose();
+  this.addToScene = function() {
+    scene.add(particleCloud);
   }
-  oldTubes = [];
-  for (var p of planets) {
-    if (p.positions.length > 0) {
-      var t = p.lastMesh;
-      var mesh = p.meshes[t];
+  this.removeFromScene = function() {
+    scene.remove(particleCloud);
+    geometry.dispose();
+    material.dispose();
+  }
+  this.addToScene();
+}
 
-      var mapPositionToScene = function(position) {
-        var starScale = 5.0*SCALE;
-        if (p.isStar) {
-          position = {
-            x: position.x / starScale + p.parent.position.x,
-            y: position.y / starScale + p.parent.position.y,
-            z: position.z / starScale + p.parent.position.z
-          };
-        }
-        return {
-          x: position.x * maxX,
-          y: position.y * maxY,
-          z: position.z * maxZ
-        };
-      };
+var RenderTool = function() {
+  var bigGeometry = new THREE.Geometry();
+  var shader = $('#fragmentshader2').text();
+  var meshMaker = new MeshMaker(shader);
+  var bigMesh = new THREE.Mesh(bigGeometry, meshMaker.shaderMaterial);
+  //scene.add(bigMesh);
+  var renderCount = 0;
+  var oldTubes = [];
 
-      var createTube = function() {
-        var path = [];
-        for (var pos of p.positions) {
-          pos = mapPositionToScene(pos);
-          var pos_vec3 = new THREE.Vector3(pos.x, pos.y, pos.z);
-          path.push(pos_vec3);
-        }
-        path = new THREE.SplineCurve3(path);
-        var geometry = new THREE.TubeGeometry(
-            path,  //path
-            tubeSegments,    //segments
-            0.3,     //radius
-            4,     //radiusSegments
-            false  //closed
-        );
-        var tube = new THREE.Mesh(geometry, mesh.material);
-        scene.add(tube);
-        oldTubes.push(tube);
+  var particles = new Particles();
+  var oldParticles = [];
+
+  var mapPositionToScene = function(p, position) {
+    if (p.isStar) {
+      position = {
+        x: position.x * starScale + p.parent.position.x,
+        y: position.y * starScale + p.parent.position.y,
+        z: position.z * starScale + p.parent.position.z
       };
+    }
+    return {
+      x: position.x * maxX,
+      y: position.y * maxY,
+      z: position.z * maxZ
+    };
+  };
+
+  var createTube = function(p, mesh) {
+    var path = [];
+    for (var pos of p.positions) {
+      pos = mapPositionToScene(p, pos);
+      var pos_vec3 = new THREE.Vector3(pos.x, pos.y, pos.z);
+      path.push(pos_vec3);
+    }
+    if (path.length == 0) return;
+    path = new THREE.SplineCurve3(path);
+    var geometry = new THREE.TubeGeometry(
+        path,  //path
+        tubeSegments,    //segments
+        0.3,     //radius
+        4,     //radiusSegments
+        false  //closed
+    );
+    var tube = new THREE.Mesh(geometry, p.tubeMaterial);
+    scene.add(tube);
+    oldTubes.push(tube);
+  };
+
+  var updateMeshes = function(p, timeVal) {
+    var t = p.lastMesh;
+    var mesh = p.meshes[t];
+    if (mesh === undefined) return;
+    var pos = mapPositionToScene(p, p.position);
+    mesh.position.set(pos.x, pos.y, pos.z);
+    
+    var dir = new THREE.Vector3(
+                mesh.position.x + p.velocity.x, 
+                mesh.position.y + p.velocity.y,
+                mesh.position.z + p.velocity.z);
+    mesh.lookAt(dir);
+
+    var scale = 1.0 + p.radius * 0.0;
+    mesh.scale.x = scale;
+    mesh.scale.y = scale;
+    mesh.scale.z = scale;
+
+    if (mesh.material.uniforms !== undefined &&
+        mesh.material.uniforms.time !== undefined) {
+      mesh.material.uniforms.time.value = timeVal + p.index * 637;
+      var color = p.color;
+      if (p.isStar) {
+        color = p.parent.color;
+      }
+      mesh.material.uniforms.color.value =
+        new THREE.Color(color.r, 
+                        color.g,
+                        color.b);
+    }
+    p.lastMesh = (p.lastMesh + 1) % p.meshes.length;
+  };
+
+  this.render = function() {
+    renderCount += 1;
+    var i = 0;
+    var newTime = (new Date().getTime()) / 1000.0;
+    var timeVal = newTime - startTime;
+    var sc = (Math.sin(timeVal) + 1.0) * 20.0 + 10.0;
+    //camera.position.z = sc;
+    //camera.rotation.z = Math.sin(timeVal)*0.1;
+    if (useTubes) {
+      for (var tube of oldTubes) {
+        scene.remove(tube);
+        //tube.dispose();
+        tube.geometry.dispose();
+        //material.dispose();
+        //texture.dispose();
+      }
+      oldTubes = [];
+    }
+    if (useParticles) {
+      if (!useParticleTrail) {
+        particles.removeFromScene();
+      } else {
+        oldParticles.push(particles);
+        var i = 0;
+        for (var pt of oldParticles) {
+          pt.setOpacity(i / oldParticles.length);
+          i++;
+        }
+      }
+      particles = new Particles();
+    }
+    for (var i = 0; i < planets.length; i++) {
+      var p = planets[i];
       if (useTubes) {
-        createTube();
+        createTube(p);
       }
-
-      var pos = mapPositionToScene(p.position);
-      mesh.position.set(pos.x, pos.y, pos.z);
-      
-      var dir = new THREE.Vector3(
-                  mesh.position.x + p.velocity.x, 
-                  mesh.position.y + p.velocity.y,
-                  mesh.position.z + p.velocity.z);
-      mesh.lookAt(dir);
-
-      var scale = 1.0 + p.radius * 0.0;
-      mesh.scale.x = scale;
-      mesh.scale.y = scale;
-      mesh.scale.z = scale;
-
-      if (mesh.material.uniforms !== undefined &&
-          mesh.material.uniforms.time !== undefined) {
-        mesh.material.uniforms.time.value = timeVal + p.index * 637;
-        var color = p.color;
-        if (p.isStar) {
-          color = p.parent.color;
-        }
-        mesh.material.uniforms.color.value =
-          new THREE.Color(color.r, 
-                          color.g,
-                          color.b);
+      if (useParticles) {
+        var pos = mapPositionToScene(p, p.position);
+        pos = new THREE.Vector3(pos.x, pos.y, pos.z);
+        particles.add(pos, 1.0, p.color, p.color2);
       }
-      p.lastMesh = (p.lastMesh + 1) % p.meshes.length;
-
-      //mesh.updateMatrix();
-      //bigGeometry.merge(mesh.geometry, mesh.matrix);
+      if (useMeshes) {
+        updateMeshes(p, timeVal);
+      }
     }
     
-    i += 1;
-  }
-  
-  //var planetsTexture = genTexture();
-  //screenMaterial.uniforms.planetsTexture.value = planetsTexture;
-
-  if (!useBackBuffer) {
-    renderer.render(scene, camera);
-  } else {
-    renderer.render(scene, camera, rtScreen, true);
-    renderer.render(screenScene, screenCamera, null, false);
-    renderer.render(screenScene, screenCamera, rtBackBuffer1, false);
-  }
-  
-  // swap buffers
-  var a = rtBackBuffer2;
-  rtBackBuffer2 = rtBackBuffer1;
-  rtBackBuffer1 = a;
-  screenMaterial.uniforms.backbuffer.value = rtBackBuffer2;
-  
-  stats.update();
-  requestAnimationFrame(render);
+    if (!useBackBuffer) {
+      renderer.render(scene, camera);
+    } else {
+      renderer.render(scene, camera, rtScreen, true);
+      renderer.render(screenScene, screenCamera, null, false);
+      renderer.render(screenScene, screenCamera, rtBackBuffer1, false);
+    }
+    
+    // swap buffers
+    var a = rtBackBuffer2;
+    rtBackBuffer2 = rtBackBuffer1;
+    rtBackBuffer1 = a;
+    screenMaterial.uniforms.backbuffer.value = rtBackBuffer2;
+    
+    stats.update();
+    requestAnimationFrame(() => this.render());
+  };
 };
 
 if (debugCompute) {
@@ -746,5 +835,6 @@ if (debugCompute) {
 } else {
   updatePlanets();
   setInterval(updatePlanets, 10);
-  render();  
+  var rt = new RenderTool();
+  rt.render();
 }
