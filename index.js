@@ -2,38 +2,45 @@
 
 // noprotect
 
-var planets = [];
-var planetCount = 25;
-var starCount = 25;
-var maxSpeed = 0.01;
-var minSpeed = 0.001;
-var dist_reduction = 1.0e5;
-var speed_reduction = 1.0;
-var star_speed_reduction = 0.1;
-var minDist = 0.001;
-var trailLength = 100;
-var starTrailLength = 1;
-var memorizeGeometry = true;
-var randomWalk = true;
-var debugCompute = false;
-var useBackBuffer = false;
-var useShader = true;
-var useTubes = false;
-var tubeSegments = 20;
-var useParticles = false;
-var useMeshes = !useTubes && !useParticles;
-var maxParticles = 10000;
-var useParticleTrail = true;
+var Config = function() {
+  this.planetCount = 25;
+  this.starCount = 25;
+  this.maxSpeed = 0.01;
+  this.minSpeed = 0.001;
+  this.dist_reduction = 1.0e5;
+  this.speed_reduction= 1.0;
+  this.star_speed_reduction = 0.1;
+  this.minDist = 0.001;
+  this.trailLength = 100;
+  this.starTrailLength = 1;
+  this.randomWalk = true;
+  this.useBackBuffer = false;
+  this.useShader = true;
+  this.useTubes = false;
+  this.tubeSegments = 20;
+  this.useParticles = false;
+  this.useMeshes = !this.useTubes && !this.useParticles;
+  this.useParticleTrail = true;
+  this.SCALE = 20;
+  this.starScale = 1.0 / (1.0 * this.SCALE);
+  this.maxX = 1.0 * this.SCALE / 2.0 * window.innerWidth / window.innerHeight;
+  this.maxY = 1.0 * this.SCALE / 2.0;
+  this.maxZ = 1.0 * this.SCALE;
+};
 
-var SCALE = 20;
-var starScale = 1.0 / (1.0 * SCALE);
-var maxX = 1.0 * SCALE / 2.0 * window.innerWidth / window.innerHeight;
-var maxY = 1.0 * SCALE / 2.0;
-var maxZ = 1.0 * SCALE;
+var debugCompute = false;
+
+var config = new Config();
+var gui = new dat.GUI();
+for (var varName in config) {
+  gui.add(config, varName);
+}
+
+var planets = [];
 
 var scene = new THREE.Scene();
 var camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
-camera.position.z = SCALE;
+camera.position.z = config.SCALE;
 
 var stats = new Stats();
 stats.domElement.style.position = 'absolute';
@@ -110,7 +117,7 @@ var ComputeShader = function() {
   this.material = 
     new THREE.ShaderMaterial({
       uniforms: {
-        dist_reduction: { type: "f", value: dist_reduction },
+        dist_reduction: { type: "f", value: config.dist_reduction },
         planetsTexture: { type: "t", value: null  },
         resolution: { type: "v2", value: new THREE.Vector2(tw, th) }
       },
@@ -169,14 +176,6 @@ var ComputeShader = function() {
     for (var planet of planets) {
       var i = planet.index * vec4PerPlanet * rs;
       var position = planet.position;
-      var starScale = 15.0;
-      /*if (planet.isStar) {
-        position = {
-            x: position.x / starScale + planet.parent.position.x,
-            y: position.y / starScale + planet.parent.position.y,
-            z: position.z / starScale + planet.parent.position.z
-          };
-      }*/
       var p = {
         x: (position.x + 1.0) / 2.0,
         y: (position.y + 1.0) / 2.0,
@@ -299,7 +298,7 @@ var MeshMaker = function(shader) {
   }
   
   this.createMesh = function() {  
-    if (useShader) {
+    if (config.useShader) {
       var mesh = new THREE.Mesh(this.geometry, this.shaderMaterial);
     } else {
       var mesh = new THREE.Mesh(this.geometry, this.material);
@@ -322,14 +321,14 @@ var createPlanet = function(index) {
       z: randInit()
     },
     velocity: {
-      x: randInit() * maxSpeed,
-      y: randInit() * maxSpeed,
-      z: randInit() * maxSpeed
+      x: randInit() * config.maxSpeed,
+      y: randInit() * config.maxSpeed,
+      z: randInit() * config.maxSpeed
     },
     mass: Math.random(),
     radius: Math.random(),
     positions: [],
-    maxPositions: trailLength,
+    maxPositions: config.trailLength,
     meshes: [],
     lastMesh: 0,
     color: {
@@ -347,7 +346,7 @@ var createPlanet = function(index) {
 };
 
 // create planets
-for (var i = 0; i < planetCount; i++) {
+for (var i = 0; i < config.planetCount; i++) {
   var planet = createPlanet(i);
   planets.push(planet);
 }
@@ -367,10 +366,10 @@ for (var p1 of planets) {
 
 // add star formations
 var starPlanets = [];
-var index = planetCount;
+var index = config.planetCount;
 for (var planet of planets) {
   var theseStars = [];
-  for (var s = 0; s < starCount; s++) {
+  for (var s = 0; s < config.starCount; s++) {
     star = createPlanet(index);
     index += 1;
     starPlanets.push(star);
@@ -378,7 +377,7 @@ for (var planet of planets) {
     star.radius = planet.radius * 0.5;
     star.mass = 1.0;
     star.isStar = true;
-    star.maxPositions = starTrailLength;
+    star.maxPositions = config.starTrailLength;
     theseStars.push(star);
     var w = 1.0;
     var edge = [star, planet, w];
@@ -398,39 +397,39 @@ for (var star of starPlanets) {
 }
 
 var createWalls = function() {
-  var planeGeo = new THREE.PlaneGeometry( SCALE*2.0 + 0.1, SCALE*2.0 + 0.1 );
+  var planeGeo = new THREE.PlaneGeometry( config.SCALE*2.0 + 0.1, config.SCALE*2.0 + 0.1 );
 
   var wallColor = 0x111111;
 
   var planeTop = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
-  planeTop.position.y = maxY;
+  planeTop.position.y = config.maxY;
   planeTop.rotateX( Math.PI / 2 );
   scene.add( planeTop );
 
   var planeBottom = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
-  planeBottom.position.y = -maxY;
+  planeBottom.position.y = -config.maxY;
   planeBottom.rotateX( -Math.PI / 2 );
   scene.add( planeBottom );
   
   var planeBack = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
-  planeBack.position.z = -maxZ;
+  planeBack.position.z = -config.maxZ;
   planeBack.position.y = 0.0;
   scene.add( planeBack );
   
   var planeFront = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
-  planeFront.position.z = maxZ;
+  planeFront.position.z = config.maxZ;
   planeFront.position.y = 0.0;
   planeFront.rotateY( Math.PI );
   scene.add( planeFront );
   
   var planeRight = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
-  planeRight.position.x = maxX;
+  planeRight.position.x = config.maxX;
   planeRight.position.y = 0.0;
   planeRight.rotateY( - Math.PI / 2 );
   scene.add( planeRight );
   
   var planeLeft = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
-  planeLeft.position.x = -maxX;
+  planeLeft.position.x = -config.maxX;
   planeLeft.position.y = 0.0;
   planeLeft.rotateY( Math.PI / 2 );
   scene.add( planeLeft );
@@ -459,22 +458,22 @@ var createMeshes = function() {
 
   for (var p of planets) {
     meshMakers[p.index % meshMakers.length].initShader();
-    if (useTubes) {
+    if (config.useTubes) {
       p.tubeMaterial = meshMakers[p.index % meshMakers.length].shaderMaterial;
     }
     if (p.isStar) {
-      for (var t = 0; t < starTrailLength; t++) {
+      for (var t = 0; t < config.starTrailLength; t++) {
         var mesh = meshMakers[p.index % meshMakers.length].createMesh();
         p.meshes.push(mesh);
-        if (useMeshes) {
+        if (config.useMeshes) {
           scene.add(mesh);
         }
       }
     } else {
-      for (var t = 0; t < trailLength; t++) {
+      for (var t = 0; t < config.trailLength; t++) {
         var mesh = meshMakers[p.index % meshMakers.length].createMesh();
         p.meshes.push(mesh);
-        if (useMeshes) {
+        if (config.useMeshes) {
           scene.add(mesh);
         }
       }
@@ -485,7 +484,7 @@ var createMeshes = function() {
 var createLights = function() {
   //scene.add(new THREE.AmbientLight(0x444444));
   var mainLight = new THREE.PointLight( 0xffffff, 1.5, 250 );
-  mainLight.position.set(0.0, 0.0, maxZ);
+  mainLight.position.set(0.0, 0.0, config.maxZ);
   scene.add(mainLight);
 
   /*var directionalLight = new THREE.DirectionalLight( 0xffffff, 1 );
@@ -496,10 +495,10 @@ var createLights = function() {
   //scene.add( pointLight );
 };
 
-if (!useBackBuffer) {
+if (!config.useBackBuffer) {
   createWalls();
 }
-//if (!useParticles) {
+//if (!config.useParticles) {
   createMeshes();
 //}
 createLights();
@@ -570,7 +569,7 @@ var updatePlanets = function() {
                          pw(diff.y, 2.0) +
                          pw(diff.z, 2.0));
     var F = p1.mass * p2.mass * w;
-    F = dist / dist_reduction;
+    F = dist / config.dist_reduction;
     vs[p1.index].x += (diff.x * F);
     vs[p1.index].y += (diff.y * F);
     vs[p1.index].z += (diff.z * F);
@@ -581,7 +580,7 @@ var updatePlanets = function() {
     var v = vs[planet.index];
     
     // add random walk
-    if (randomWalk && !planet.isStar) {
+    if (config.randomWalk && !planet.isStar) {
       var rf = 500;
       v.x += randInit() / rf;
       v.y += randInit() / rf;
@@ -597,10 +596,10 @@ var updatePlanets = function() {
                           planet.velocity.y * planet.velocity.y + 
                           planet.velocity.z * planet.velocity.z
                          );
-      if (speed > maxSpeed) {
-        planet.velocity.x /= (speed / maxSpeed);
-        planet.velocity.y /= (speed / maxSpeed);
-        planet.velocity.z /= (speed / maxSpeed);
+      if (speed > config.maxSpeed) {
+        planet.velocity.x /= (speed / config.maxSpeed);
+        planet.velocity.y /= (speed / config.maxSpeed);
+        planet.velocity.z /= (speed / config.maxSpeed);
       }
     //}
   }
@@ -608,7 +607,7 @@ var updatePlanets = function() {
   // update positions
   for (var planet2 of planets) {
     // store old position
-    if (useTubes) {
+    if (config.useTubes) {
       planet2.positions.push({
         x: planet2.position.x,
         y: planet2.position.y,
@@ -620,7 +619,7 @@ var updatePlanets = function() {
     }
     
     // compute new
-    var reduction = planet2.isStar ? star_speed_reduction : speed_reduction;
+    var reduction = planet2.isStar ? config.star_speed_reduction : config.speed_reduction;
     [planet2.position.x, planet2.velocity.x] = reflect(reduction, planet2.position.x, planet2.velocity.x);    
     [planet2.position.y, planet2.velocity.y] = reflect(reduction, planet2.position.y, planet2.velocity.y);
     [planet2.position.z, planet2.velocity.z] = reflect(reduction, planet2.position.z, planet2.velocity.z);
@@ -658,13 +657,12 @@ var Particles = function() {
   this.add = function(pt, size, color, color2) {
     var vertices = geometry.vertices;
     var idx = vertices.length;
-    if (vertices.length < maxParticles) {
-      vertices.push(pt);
-    } else {
+    vertices.push(pt);
+    /*} else {
       geometry[currentIndex] = pt;
       idx = currentIndex;
       currentIndex = (currentIndex + 1) % maxParticles
-    }
+    }*/
     var vsize = material.attributes.psize.value;
     var vcolor = material.attributes.pcolor.value;
     var vcolor2 = material.attributes.pcolor2.value;
@@ -698,15 +696,15 @@ var RenderTool = function() {
   var mapPositionToScene = function(p, position) {
     if (p.isStar) {
       position = {
-        x: position.x * starScale + p.parent.position.x,
-        y: position.y * starScale + p.parent.position.y,
-        z: position.z * starScale + p.parent.position.z
+        x: position.x * config.starScale + p.parent.position.x,
+        y: position.y * config.starScale + p.parent.position.y,
+        z: position.z * config.starScale + p.parent.position.z
       };
     }
     return {
-      x: position.x * maxX,
-      y: position.y * maxY,
-      z: position.z * maxZ
+      x: position.x * config.maxX,
+      y: position.y * config.maxY,
+      z: position.z * config.maxZ
     };
   };
 
@@ -721,7 +719,7 @@ var RenderTool = function() {
     path = new THREE.SplineCurve3(path);
     var geometry = new THREE.TubeGeometry(
         path,  //path
-        tubeSegments,    //segments
+        config.tubeSegments,    //segments
         0.3,     //radius
         4,     //radiusSegments
         false  //closed
@@ -772,7 +770,7 @@ var RenderTool = function() {
     var sc = (Math.sin(timeVal) + 1.0) * 20.0 + 10.0;
     //camera.position.z = sc;
     //camera.rotation.z = Math.sin(timeVal)*0.1;
-    if (useTubes) {
+    if (config.useTubes) {
       for (var tube of oldTubes) {
         scene.remove(tube);
         //tube.dispose();
@@ -782,8 +780,8 @@ var RenderTool = function() {
       }
       oldTubes = [];
     }
-    if (useParticles) {
-      if (!useParticleTrail) {
+    if (config.useParticles) {
+      if (!config.useParticleTrail) {
         particles.removeFromScene();
       } else {
         oldParticles.push(particles);
@@ -797,20 +795,20 @@ var RenderTool = function() {
     }
     for (var i = 0; i < planets.length; i++) {
       var p = planets[i];
-      if (useTubes) {
+      if (config.useTubes) {
         createTube(p);
       }
-      if (useParticles) {
+      if (config.useParticles) {
         var pos = mapPositionToScene(p, p.position);
         pos = new THREE.Vector3(pos.x, pos.y, pos.z);
         particles.add(pos, 1.0, p.color, p.color2);
       }
-      if (useMeshes) {
+      if (config.useMeshes) {
         updateMeshes(p, timeVal);
       }
     }
     
-    if (!useBackBuffer) {
+    if (!config.useBackBuffer) {
       renderer.render(scene, camera);
     } else {
       renderer.render(scene, camera, rtScreen, true);
