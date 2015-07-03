@@ -26,8 +26,9 @@ var Config = function () {
   this.useShader = true;
   this.useTubes = false;
   this.tubeSegments = 20;
-  this.useParticles = true;
-  this.useMeshes = !this.useTubes && !this.useParticles;
+  this.useBufferGeometry = true;
+  this.useParticles = false;
+  this.useMeshes = !this.useBufferGeometry && !this.useTubes && !this.useParticles;
   this.useParticleTrail = true;
   this.usePTrailOpacity = false;
   this.radiusScale = 0.4;
@@ -397,7 +398,8 @@ var createPlanets = function () {
 var createWalls = function () {
   var planeGeo = new THREE.PlaneGeometry(window.planetsConfig.scale * 2.0 + 0.1, window.planetsConfig.scale * 2.0 + 0.1);
 
-  var wallColor = 0x111111;
+  //var wallColor = 0x111111;
+  var wallColor = 0xffffff;
 
   var walls = [];
 
@@ -642,6 +644,41 @@ var Particles = function () {
   };
 };
 
+var BufferGeometry = function () {
+  var geometry = new THREE.BufferGeometry();
+
+  var length = 0;
+  var stepSize = 1000;
+
+  var vertices = new Float32Array(0);
+  var material = new THREE.LineBasicMaterial({ vertexColors: THREE.VertexColors });
+  var mesh = new THREE.Line(geometry, material);
+
+  this.addPoint = function (pos) {
+    var stepLength = Math.ceil(length / stepSize) * stepSize;
+    stepLength *= 3;
+    if (stepLength >= vertices.length) {
+      var oldVertices = vertices;
+      vertices = new Float32Array(stepLength);
+      for (var i = 0; i < oldVertices.length; i++) {
+        vertices[i] = oldVertices[i];
+      }
+      for (var i = oldVertices.length; i < vertices.length; i++) {
+        vertices[i] = Number.NEGATIVE_INFINITY;
+      }
+    }
+    vertices[length*3 + 0] = pos.x;
+    vertices[length*3 + 1] = pos.y;
+    vertices[length*3 + 2] = pos.z;
+    geometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    length += 1;
+  }
+
+  this.addToScene = function (scene) {
+    scene.add(mesh);
+  }
+};
+
 var RenderTool = function () {
   var
     renderCount = 0,
@@ -867,11 +904,11 @@ var RenderTool = function () {
     }
 
     for (var planet of window.planetsState.planets) {
+      var pos = mapPositionToScene(planet, planet.position);
       if (window.planetsConfig.useTubes) {
         createTube(planet);
       }
       if (window.planetsConfig.useParticles) {
-        var pos = mapPositionToScene(planet, planet.position);
         pos = new THREE.Vector3(pos.x, pos.y, pos.z);
         var size = window.planetsConfig.radiusScale * 20.0;
         if (window.planetsConfig.usePlanetRadius) {
@@ -886,6 +923,13 @@ var RenderTool = function () {
       }
       if (window.planetsConfig.useMeshes) {
         updateMeshes(planet, timeVal);
+      }
+      if (window.planetsConfig.useBufferGeometry) {
+        if (planet.bufferGeometry === undefined) {
+          planet.bufferGeometry = new BufferGeometry();
+          planet.bufferGeometry.addToScene(scene);
+        }
+        planet.bufferGeometry.addPoint(pos);
       }
     }
 
