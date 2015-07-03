@@ -539,50 +539,26 @@ void main( void ) {
 #ifdef GL_ES
       precision mediump float;
 #endif
-uniform sampler2D planetsTexture;
+uniform sampler2D texturePositions;
+uniform sampler2D textureVelocities;
 uniform vec2 resolution;
 uniform float dist_reduction;
 varying vec3 texcoord;
-      
-vec4 pack_depth(const in float depth)
-{
-    const vec4 bit_shift = vec4(255.0*255.0*255.0, 255.0*255.0, 255.0, 1.0);
-    const vec4 bit_mask  = vec4(0.0, 1.0/255.0, 1.0/255.0, 1.0/255.0);
-    vec4 res = fract(depth * bit_shift);
-    res -= res.xxyz * bit_mask;
-    return res;
-}
-
-float unpack_depth(const in vec4 rgba_depth)
-{
-    const vec4 bit_shift = vec4(1.0/(255.0*255.0*255.0), 1.0/(255.0*255.0), 1.0/255.0, 1.0);
-    float depth = dot(rgba_depth, bit_shift);
-    return depth;
-}
+#define SQPLANETF float(SQPLANET)
+#define VEC4PERPLANETF float(VEC4PERPLANET)
       
 void main( void ) {
   vec2 p = gl_FragCoord.xy / resolution;
-  const float dx = 1.0 / (SQPLANET * VEC4PERPLANET);
-  vec2 pPlanetX = vec2(p.x * VEC4PERPLANET, p.y);
-  vec2 pPlanetY = vec2(pPlanetX.x + dx, pPlanetX.y);
-  vec2 pPlanetZ = vec2(pPlanetY.x + dx, pPlanetY.y);
+  vec2 pPlanet = vec2(p.x, p.y);
 
-  vec3 planetPos = vec3(
-    unpack_depth(texture2D(planetsTexture, pPlanetX)),
-    unpack_depth(texture2D(planetsTexture, pPlanetY)),
-    unpack_depth(texture2D(planetsTexture, pPlanetZ)));
-  //vec3 planetVelocity = texture2D(planetsTexture, pPlanetV).xyz;
+  vec3 planetPos = texture2D(texturePositions, pPlanet).xyz;
+  vec3 planetVelocity = texture2D(textureVelocities, pPlanet).xyz;
 
   vec3 c = vec3(0.0);
-  for (float x = 0.0; x < SQPLANET * VEC4PERPLANET; x += VEC4PERPLANET) {
-    for (float y = 0.0; y < SQPLANET; y += 1.0) {
-      vec2 tposX = vec2(x / SQPLANET, y / SQPLANET);
-      vec2 tposY = vec2(tposX.x + dx, tposX.y);
-      vec2 tposZ = vec2(tposY.x + dx, tposY.y);
-      vec3 planet2Pos = vec3(
-        unpack_depth(texture2D(planetsTexture, tposX)),
-        unpack_depth(texture2D(planetsTexture, tposY)),
-        unpack_depth(texture2D(planetsTexture, tposZ)));
+  for (float x = 0.0; x < SQPLANETF; x += 1.0) {
+    for (float y = 0.0; y < SQPLANETF; y += 1.0) {
+      vec2 tpos = vec2(x / SQPLANETF, y / SQPLANETF);
+      vec3 planet2Pos = texture2D(texturePositions, tpos).xyz;
       vec3 diff = planet2Pos - planetPos;
       float dist = length(diff);
       dist /= dist_reduction;
@@ -591,7 +567,8 @@ void main( void ) {
   }
 
   //gl_FragColor = vec4(vec, 1.0);
-  gl_FragColor = vec4(vec3(planetPos.x, planetPos.y, planetPos.z), 1.0);
+  //gl_FragColor = vec4(planetVelocity + c, 1.0);
+  gl_FragColor = vec4(planetVelocity, 1.0);
   //gl_FragColor = pack_depth(planetPos.x);
   //gl_FragColor = vec4(planetVelocity + c, 1.0);
   //gl_FragColor = vec4(pPlanet.x, pPlanet.y, 0.5, 1.0);
