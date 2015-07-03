@@ -42,7 +42,7 @@
 
             vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
 
-            gl_PointSize = psize * 20.0;
+            gl_PointSize = psize;
             
             gl_Position = projectionMatrix * mvPosition;
             
