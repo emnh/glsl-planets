@@ -26,8 +26,9 @@ var Config = function () {
   this.useShader = true;
   this.useTubes = false;
   this.tubeSegments = 20;
-  this.useBufferGeometry = true;
-  this.useParticles = false;
+  this.useBufferGeometry = false;
+  this.useParticles = true;
+  this.particleInterpolation = 10.0;
   this.useMeshes = !this.useBufferGeometry && !this.useTubes && !this.useParticles;
   this.useParticleTrail = true;
   this.usePTrailOpacity = false;
@@ -651,7 +652,10 @@ var BufferGeometry = function () {
   var stepSize = 1000;
 
   var vertices = new Float32Array(0);
-  var material = new THREE.LineBasicMaterial({ vertexColors: THREE.VertexColors });
+  var material = new THREE.LineBasicMaterial({
+    vertexColors: THREE.VertexColors,
+    linewidth: 1.0
+  });
   var mesh = new THREE.Line(geometry, material);
 
   this.addPoint = function (pos) {
@@ -660,23 +664,25 @@ var BufferGeometry = function () {
     if (stepLength >= vertices.length) {
       var oldVertices = vertices;
       vertices = new Float32Array(stepLength);
-      for (var i = 0; i < oldVertices.length; i++) {
+      var i;
+      for (i = 0; i < oldVertices.length; i++) {
         vertices[i] = oldVertices[i];
       }
-      for (var i = oldVertices.length; i < vertices.length; i++) {
+      for (i = oldVertices.length; i < vertices.length; i++) {
         vertices[i] = Number.NEGATIVE_INFINITY;
       }
     }
-    vertices[length*3 + 0] = pos.x;
-    vertices[length*3 + 1] = pos.y;
-    vertices[length*3 + 2] = pos.z;
-    geometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    vertices[length * 3 + 0] = pos.x;
+    vertices[length * 3 + 1] = pos.y;
+    vertices[length * 3 + 2] = pos.z;
+    geometry.addAttribute("position", new THREE.BufferAttribute(vertices, 3));
+    geometry.computeBoundingSphere();
     length += 1;
-  }
+  };
 
   this.addToScene = function (scene) {
     scene.add(mesh);
-  }
+  };
 };
 
 var RenderTool = function () {
@@ -909,7 +915,6 @@ var RenderTool = function () {
         createTube(planet);
       }
       if (window.planetsConfig.useParticles) {
-        pos = new THREE.Vector3(pos.x, pos.y, pos.z);
         var size = window.planetsConfig.radiusScale * 20.0;
         if (window.planetsConfig.usePlanetRadius) {
           size *= planet.radius;
@@ -918,8 +923,30 @@ var RenderTool = function () {
         if (planet.isStar && window.planetsConfig.useParentColor) {
           color = planet.parent.color;
         }
-        particles.add(pos, size, color, planet.color2);
+        if (planet.oldParticlePos !== undefined && window.planetsConfig.particleInterpolation > 0.0) {
+          var p1 = planet.oldParticlePos;
+          var p2 = pos;
+          var diff = {
+            x: p2.x - p1.x,
+            y: p2.y - p1.y,
+            z: p2.z - p1.z
+          };
+          var dist = Math.sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
+          var maxI = window.planetsConfig.particleInterpolation * dist;
+          for (i = 1; i <= maxI; i++) {
+            var scale = i / maxI;
+            var p3 = {
+              x: p1.x + diff.x * scale,
+              y: p1.y + diff.y * scale,
+              z: p1.z + diff.z * scale
+            };
+            var v3 = new THREE.Vector3(p3.x, p3.y, p3.z);
+            particles.add(v3, size, color, planet.color2);
+          }
+        }
+        particles.add(new THREE.Vector3(pos.x, pos.y, pos.z), size, color, planet.color2);
         particles.addToScene(scene);
+        planet.oldParticlePos = pos;
       }
       if (window.planetsConfig.useMeshes) {
         updateMeshes(planet, timeVal);
