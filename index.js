@@ -45,7 +45,7 @@ var Config = function () {
 };
 window.planetsConfig = new Config();
 
-var debugCompute = false;
+var debugCompute = true;
 
 var ComputeShader = function () {
   var
@@ -55,41 +55,145 @@ var ComputeShader = function () {
     tw = sq,
     outHeight = sq,
     outWidth = sq,
-    fShader, plane, quad;
+    fShader;
 
   this.renderer = new THREE.WebGLRenderer();
   this.renderer.setSize(outWidth, outHeight);
   // XXX: for debug only
   document.body.appendChild(this.renderer.domElement);
 
-  this.camera = new THREE.PerspectiveCamera(100, outWidth / outHeight, 0.1, 1000);
+  this.camera = new THREE.Camera();
   this.camera.position.z = 1;
+
+  // Init RTT stuff
+  var gl = this.renderer.getContext();
+
+  if (!gl.getExtension("OES_texture_float")) {
+    alert("No OES_texture_float support for float textures!");
+    return;
+  }
+
+  if (gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS) == 0) {
+    alert("No support for vertex shader textures!");
+    return;
+  }
 
   this.scene = new THREE.Scene();
 
-  fShader = $("#fragment_shader_compute").text();
+  var defines = {
+    SQPLANET: sq,
+    VEC4PERPLANET: floatsPerPlanet
+  };
 
-  this.material =
+  this.uniforms = {
+    speedReduction: { type: "f", value: window.planetsConfig.speedReduction * 10.0 },
+    planetCount: { type: "f", value: window.planetsConfig.planetCount },
+    minDist: { type: "f", value: window.planetsConfig.minDist },
+    distReduction: { type: "f", value: window.planetsConfig.distReduction },
+    texturePositions: { type: "t", value: null },
+    textureVelocities: { type: "t", value: null },
+    resolution: { type: "v2", value: new THREE.Vector2(tw, th) }
+  };
+
+  this.uniformsPassThrough = {
+    passTexture: { type: "t", value: null },
+    resolution: { type: "v2", value: new THREE.Vector2(tw, th) }
+  };
+
+  this.passThroughMaterial =
     new THREE.ShaderMaterial({
-      defines: {
-        SQPLANET: sq,
-        VEC4PERPLANET: floatsPerPlanet
-      },
-      uniforms: {
-        distReduction: { type: "f", value: window.planetsConfig.distReduction },
-        texturePositions: { type: "t", value: null },
-        textureVelocities: { type: "t", value: null },
-        resolution: { type: "v2", value: new THREE.Vector2(tw, th) }
-      },
-      vertexShader: $("#vertexshader").text(),
-      fragmentShader: fShader,
+      defines: defines,
+      uniforms: this.uniformsPassThrough,
+      vertexShader: $("#vertexShaderPassThrough").text(),
+      fragmentShader: $("#fragmentShaderPassThrough").text(),
       depthWrite: false
     });
 
-  plane = new THREE.PlaneGeometry(sq, sq);
-  quad = new THREE.Mesh(plane, this.material);
-  quad.position.z = -1;
-  this.scene.add(quad);
+  this.velocityMaterial =
+    new THREE.ShaderMaterial({
+      defines: defines,
+      uniforms: this.uniforms,
+      vertexShader: $("#vertexShaderPassThrough").text(),
+      fragmentShader: $("#fragmentShaderVelocity").text(),
+      depthWrite: false
+    });
+
+  this.positionMaterial =
+    new THREE.ShaderMaterial({
+      defines: defines,
+      uniforms: this.uniforms,
+      vertexShader: $("#vertexShaderPassThrough").text(),
+      fragmentShader: $("#fragmentShaderPosition").text(),
+      depthWrite: false
+    });
+
+  var plane = new THREE.PlaneBufferGeometry(2, 2);
+  this.mesh = new THREE.Mesh(plane, this.passThroughMaterial);
+  //this.mesh.position.z = -1;
+  this.scene.add(this.mesh);
+
+  var compute = this;
+
+  this.screen = new function() {
+    this.screenScene = new THREE.Scene();
+
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    this.camera.position.z = 1;
+
+    this.geometry = new THREE.Geometry();
+
+    this.material = new THREE.ShaderMaterial({
+      uniforms: {
+        texturePositions: { type: "t", value: null },
+        opacity: { type: "f", value: 1.0 },
+        //resolution: { type: "v2", value: new THREE.Vector2(tw, th) }
+        resolution: { type: "v2", value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+      },
+      attributes: {
+        pcolor: { type: "c", value: [], needsUpdate: true }
+      },
+      vertexShader: $("#vertexShaderFromPositions").text(),
+      fragmentShader: $("#fragmentshaderParticles").text(),
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    var pColor = this.material.attributes.pcolor.value;
+
+    var vertices = this.geometry.vertices;
+    for (var x = 0; x < tw; x++) {
+      for (var y = 0; y < th; y++) {
+        var xf = x / tw;
+        var yf = y / th;
+        var pt = new THREE.Vector3(xf, yf, 0.0);
+        vertices.push(pt);
+        var
+          r = Math.random(),
+          g = Math.random(),
+          b = Math.random();
+        var color = new THREE.Color(r, g, b);
+        pColor.push(color);
+      }
+    }
+
+    //var material = new THREE.PointCloudMaterial( { size: 1, sizeAttenuation: false, alphaTest: 0.5, transparent: true } );
+    this.particleCloud = new THREE.PointCloud(this.geometry, this.material);
+
+    var sphere = new THREE.SphereGeometry( 0.3, 50, 50);
+    var smat = new THREE.MeshPhongMaterial({
+      color: 0x2194ce,
+      bumpScale: 1,
+      specular: 0x111111,
+      shininess: 50,
+      shading: THREE.SmoothShading
+    });
+    var mesh = new THREE.Mesh(sphere, smat);
+    //this.screenScene.add(mesh);
+
+    this.screenScene.add(this.particleCloud);
+    this.screenScene.add(new THREE.AmbientLight(0x444444));
+  }();
 
   var rt =
     new THREE.WebGLRenderTarget(tw, tw, {
@@ -170,10 +274,19 @@ var ComputeShader = function () {
       rawVelocities[i++] = v.z;
       rawVelocities[i++] = 0.0;
     }
+
     var tPositions = new THREE.DataTexture(rawPositions, tw, th, THREE.RGBAFormat, THREE.FloatType);
+    tPositions.minFilter = THREE.NearestFilter;
+    tPositions.wrapS = THREE.ClampToEdgeWrapping;
+    tPositions.wrapT = THREE.ClampToEdgeWrapping;
     tPositions.needsUpdate = true;
+
     var tVelocities = new THREE.DataTexture(rawVelocities, tw, th, THREE.RGBAFormat, THREE.FloatType);
+    tVelocities.minFilter = THREE.NearestFilter;
+    tVelocities.wrapS = THREE.ClampToEdgeWrapping;
+    tVelocities.wrapT = THREE.ClampToEdgeWrapping;
     tVelocities.needsUpdate = true;
+
     return [tPositions, tVelocities];
     // resources:
     // http://aras-p.info/blog/2009/07/30/encoding-floats-to-rgba-the-final/
@@ -191,12 +304,53 @@ var ComputeShader = function () {
     return context.getImageData(0, 0, image.width, image.height);
   };
 
+  this.render = function () {
+    // set input textures from last round
+    this.uniforms.texturePositions.value = this.rtPositions2;
+    this.uniforms.textureVelocities.value = this.rtVelocities2;
+
+    // update velocities
+    this.mesh.material = this.velocityMaterial;
+    this.renderer.render(this.scene, this.camera, this.rtVelocities1, true);
+
+    // update positions
+    this.mesh.material = this.positionMaterial;
+    this.renderer.render(this.scene, this.camera, this.rtPositions1, true);
+
+    // render to screen
+    /*
+    this.mesh.material = this.passThroughMaterial;
+    this.uniformsPassThrough.passTexture.value = this.rtPositions2;
+    this.renderer.render(this.scene, this.camera); //, null, true);
+    */
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.render(this.screen.screenScene, this.screen.camera);
+
+    // swap buffers
+    [this.rtVelocities1, this.rtVelocities2] = [this.rtVelocities2, this.rtVelocities1];
+    [this.rtPositions1, this.rtPositions2] = [this.rtPositions2, this.rtPositions1];
+
+    window.planetsState.stats.update();
+    requestAnimationFrame(() => this.render());
+  };
+
   this.compute = function () {
     var [tPositions, tVelocities] = this.genTexture();
-    this.material.uniforms.texturePositions.value = tPositions;
-    this.material.uniforms.textureVelocities.value = tVelocities;
-    //this.renderer.render(scene, camera, this.rtCompute, true);
-    this.renderer.render(this.scene, this.camera); //, null, true);
+
+    // copy positions texture
+    this.uniformsPassThrough.passTexture.value = tPositions;
+    this.mesh.material = this.passThroughMaterial;
+    this.renderer.render(this.scene, this.camera, this.rtPositions1, true);
+    this.renderer.render(this.scene, this.camera, this.rtPositions2, true);
+
+    // copy velocities texture
+    this.uniformsPassThrough.passTexture.value = tVelocities;
+    this.mesh.material = this.passThroughMaterial;
+    this.renderer.render(this.scene, this.camera, this.rtVelocities1, true);
+    this.renderer.render(this.scene, this.camera, this.rtVelocities2, true);
+
+    this.render();
+
     //var img = this.getImageData(this.renderer.domElement);
   };
 };
@@ -707,7 +861,7 @@ var RenderTool = function () {
     renderer,
     walls = createWalls(),
     lights = createLights(),
-    stats;
+    stats = window.planetsState.stats;
 
   var setup = function () {
     var gui = new dat.GUI();
@@ -722,12 +876,6 @@ var RenderTool = function () {
     for (var light of lights) {
       scene.add(light);
     }
-
-    stats = new Stats();
-    stats.domElement.style.position = "absolute";
-    stats.domElement.style.top = "0px";
-    var container = document.getElementById("statsContainer");
-    container.appendChild(stats.domElement);
 
     screenScene = new THREE.Scene();
     screenCamera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -982,9 +1130,7 @@ var RenderTool = function () {
     }
 
     // swap buffers
-    var a = rtBackBuffer2;
-    rtBackBuffer2 = rtBackBuffer1;
-    rtBackBuffer1 = a;
+    [rtBackBuffer1, rtBackBuffer2] = [rtBackBuffer2, rtBackBuffer1];
     screenMaterial.uniforms.backbuffer.value = rtBackBuffer2;
 
     stats.update();
@@ -1008,16 +1154,24 @@ var main = function () {
     startTime: (new Date().getTime()) / 1000.0 - 500.0
   };
 
-  createPlanets();
+  var stats = new Stats();
+  window.planetsState.stats = stats;
+  stats.domElement.style.position = "absolute";
+  stats.domElement.style.top = "0px";
+  var container = document.getElementById("statsContainer");
+  container.appendChild(stats.domElement);
 
   if (debugCompute) {
-    window.planetsConfig.planetCount = 400 * 400;
+    window.planetsConfig.planetCount = 100 * 100;
     window.planetsConfig.starCount = 0;
     window.planetsConfig.trailLength = 0;
     window.planetsConfig.starTrailLength = 0;
+    createPlanets();
     var computeShader = new ComputeShader(window.planetsState.planets);
     computeShader.compute();
+    window.renderCompute = () => computeShader.render();
   } else {
+    createPlanets();
     createEdges();
     updatePlanets();
     setInterval(updatePlanets, 10);

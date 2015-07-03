@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html>
   <head>
-<script src="https://code.jquery.com/jquery-git.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r71/three.min.js"></script>
+<script src="jscache/jquery-git.js"></script>
+<script src="jscache/three.min.js"></script>
 <script src="jscache/OrbitControls.js"></script>
 <script src="jscache/stats.min.js"></script>
 <script src="jscache/dat.gui.min.js"></script>
     <title>Three.js shader demo</title>
     <style>
-      body { 
+      body {
         margin: 0;
         overflow: hidden;
       }
@@ -18,18 +18,19 @@
   </head>
   <body>
     <div id="statsContainer"></div>
-  
+
     <!-- Shaders -->
   <script type="x-shader/x-vertex" id="vertexshaderParticles">
     #ifdef GL_ES
     precision highp float;
     #endif
-        
+
     attribute float psize;
     attribute vec3 pcolor;
     attribute vec3 pcolor2;
     //varying vec3 vNormal;
     //varying vec3 texcoord;
+    varying vec3 vPosition;
     varying vec3 vColor;
     varying vec3 vColor2;
 
@@ -43,9 +44,11 @@
             vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
 
             gl_PointSize = psize;
-            
+
             gl_Position = projectionMatrix * mvPosition;
-            
+
+            vPosition = gl_Position.xyz;
+
             //texcoord = p.xyz / 5.0;
     }
 
@@ -58,6 +61,7 @@
 
       #define ADDITIVE false
 
+      varying vec3 vPosition;
       varying vec3 vColor;
       varying vec3 vColor2;
       uniform float opacity;
@@ -92,7 +96,6 @@
         //vec3 rgb = mix(vColor, vColor2, r)*(1.0-d);
         vec3 rgb = vColor * r; //(0.5 - d);
         gl_FragColor = vec4(rgb, alpha*opacity);
-
       }
   </script>
 
@@ -103,7 +106,7 @@
     #ifdef GL_ES
     precision highp float;
     #endif
-        
+
         varying vec3 vNormal;
         varying vec3 texcoord;
 
@@ -111,10 +114,10 @@
     {
             vNormal = normal;
             texcoord = position; // * vec3(0.5) + vec3(0.5);
-            
+
             vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0);
             gl_Position = p;
-            
+
             //texcoord = p.xyz / 5.0;
     }
 
@@ -164,9 +167,9 @@
     #ifdef GL_ES
     precision highp float;
     #endif
-        
+
         #define MAX_ITER 3
-        
+
         varying vec3 vNormal;
         varying vec3 texcoord;
 
@@ -176,7 +179,7 @@
         uniform vec3 color;
 
     void main()
-    {   
+    {
             // calc the dot product and clamp
             // 0 -> 1 rather than -1 -> 1
             vec3 light = vec3(0.5, 0.2, 1.0);
@@ -188,21 +191,21 @@
             // the light to the vertex normal
             float dProd = max(0.0,
                               abs(dot(vNormal, light)));
-        
+
             vec2 v_texCoord = texcoord.xy;
             //vec2 v_texCoord = gl_FragCoord.xy / resolution;
-            float time = texcoord.z + 
+            float time = texcoord.z +
                          gl_FragCoord.x / resolution.x *
-                         gl_FragCoord.y / resolution.y +
+                         gl_FragCoord.y / resolution.y
                          time;
             //vec2 v_texCoord = gl_FragCoord.xy / resolution;
-  
+
             vec2 p =  v_texCoord * 8.0 - vec2(20.0);
             vec2 i = p;
             float c = 1.0;
             float inten = .05;
 
-            for (int n = 0; n < MAX_ITER; n++) 
+            for (int n = 0; n < MAX_ITER; n++)
             {
                 float t = time * (1.0 - (3.0 / float(n+1)));
 
@@ -220,9 +223,9 @@
             //vec4 texColor = vec4(0.025, 0.0117647, 0.01568627, 1.0);
             //vec4 texColor = vec4(0.0, 0.0117647, 0.01568627, 1.0);
             vec4 texColor = vec4(color / 50.0, 1.0);
-            
+
             texColor.rgb *= pow((1.0 / (1.0 - (c + 0.0))), 3.0);
-            
+
             texColor.rgb += texture2D(material, v_texCoord).rgb;
 
             texColor.rgb *= dProd;
@@ -274,7 +277,7 @@ uniform vec2 resolution;
 varying vec3 texcoord;
 
 //
-// Description : Array and textureless GLSL 2D/3D/4D simplex 
+// Description : Array and textureless GLSL 2D/3D/4D simplex
 //               noise functions.
 //      Author : Ian McEwan, Ashima Arts.
 //  Maintainer : ijm
@@ -309,7 +312,7 @@ vec4 taylorInvSqrt(vec4 r)
 }
 
 float snoise(vec3 v)
-  { 
+  {
   const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
   const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
 
@@ -332,10 +335,10 @@ float snoise(vec3 v)
   vec3 x3 = x0 - D.yyy;      // -1.0+3.0*C.x = -0.5 = -D.y
 
 // Permutations
-  i = mod289(i); 
-  vec4 p = permute( permute( permute( 
+  i = mod289(i);
+  vec4 p = permute( permute( permute(
              i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
-           + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) 
+           + i.y + vec4(0.0, i1.y, i2.y, 1.0 ))
            + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
 
 // Gradients: 7x7 points over a square, mapped onto an octahedron.
@@ -379,10 +382,10 @@ float snoise(vec3 v)
 // Mix final noise value
   vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
   m = m * m;
-  return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), 
+  return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1),
                                 dot(p2,x2), dot(p3,x3) ) );
 }
-    
+
 #define PI 3.14159265359
 
 float s(float x, float b) {
@@ -405,16 +408,16 @@ void main( void ) {
   x -= midpoint.x;
   y -= midpoint.y;
   float b = snoise(vec3(x, y, time / 3.0)) * 0.5 + 0.5;
-  
+
   //n = snoise(vec3(x, y, time / 3.0));
   n = snoise(vec3(pow(b+1.0, r)*scale, theta, time / 3.0));
-  
+
   n = sin(n)*0.5+0.5;
   n = 0.1 / pow(abs(n), 2.);
   float hr = 0.50;
   float hue = mix(hr, hr + 0.2, n);
   vec3 rgb = hsv2rgb(vec3(0.6, 1.0, n));
-  
+
   gl_FragColor = vec4(rgb, 1.0);
 }
     </script>
@@ -422,9 +425,9 @@ void main( void ) {
     #ifdef GL_ES
     precision highp float;
     #endif
-        
+
         #define MAX_ITER 3
-        
+
         varying vec3 vNormal;
         varying vec3 texcoord;
 
@@ -433,7 +436,7 @@ void main( void ) {
         uniform vec3 color;
 
     void main()
-    {   
+    {
             // calc the dot product and clamp
             // 0 -> 1 rather than -1 -> 1
             vec3 light = vec3(0.5, 0.2, 1.0);
@@ -445,21 +448,21 @@ void main( void ) {
             // the light to the vertex normal
             float dProd = max(0.0,
                               abs(dot(vNormal, light)));
-        
+
             vec2 v_texCoord = texcoord.xy;
             //vec2 v_texCoord = gl_FragCoord.xy / resolution;
-            float time = texcoord.z + 
+            float time = texcoord.z +
                          gl_FragCoord.x / resolution.x *
-                         gl_FragCoord.y / resolution.y +
+                         gl_FragCoord.y / resolution.y
                          time;
             //vec2 v_texCoord = gl_FragCoord.xy / resolution;
-  
+
             vec2 p =  v_texCoord * 8.0 - vec2(20.0);
             vec2 i = p;
             float c = 1.0;
             float inten = .05;
 
-            for (int n = 0; n < MAX_ITER; n++) 
+            for (int n = 0; n < MAX_ITER; n++)
             {
                 float t = time * (1.0 - (3.0 / float(n+1)));
 
@@ -477,9 +480,9 @@ void main( void ) {
             //vec4 texColor = vec4(0.025, 0.0117647, 0.01568627, 1.0);
             //vec4 texColor = vec4(0.0, 0.0117647, 0.01568627, 1.0);
             vec4 texColor = vec4(color / 50.0, 1.0);
-            
+
             texColor.rgb *= pow((1.0 / (1.0 - (c + 0.0))), 3.0);
-            
+
             texColor.rgb *= dProd;
 
             gl_FragColor = vec4(texColor.rgb, 1.0);
@@ -509,44 +512,77 @@ void main( void ) {
     float time = time + texcoord.z;
   float x = position.x;
   float y = position.y;
-  
+
   for (float j = 1.; j < 16.; j += 1.) {
-    
+
     float p = 0.;
     float p2 = 0.;
-    
+
     for (float i = 1.; i < 16.; i += 1.) {
       p += s(x + 0.01 * time*(i/j), pow(2., i));
       p2 += s(y + 0.01 * time*(j/i/2.), pow(2., i));
     }
-  
+
     p = 0.5 + 0.5 * p;
     p2 = 0.5 + 0.5 * p2;
-    
+
     float color = 1.0;
     color = 0.001 / abs(p-p2); //0.01 / abs(p - position.y);
-    
+
     float color2 = 0.0005 / (abs(p - p2)*distance(position, vec2(p2, p)));
-  
+
     color = color2;
     gl_FragColor += vec4( vec3(255./256., 20./256., 147./256.)*color, 1.0);
     //gl_FragColor += texture2D(backbuffer, vec2(x, y))*0.05;
-    
+
   }
 }
       </script>
-      <script type="x-shader/x-fragment" id="fragment_shader_compute">
+    <script type="x-shader/x-vertex" id="vertexShaderPassThrough">
+      void main() {
+        gl_Position = vec4( position, 1.0 );
+      }
+    </script>
+
+   <script type="x-shader/x-vertex" id="vertexShaderFromPositions">
 #ifdef GL_ES
-      precision mediump float;
+precision highp float;
+#endif
+
+uniform sampler2D texturePositions;
+attribute vec3 pcolor;
+varying vec3 vColor;
+varying vec3 vColor2;
+
+void main() {
+  vec3 planetPos = texture2D(texturePositions, position.xy).xyz;
+  planetPos = (planetPos * 2.0) - 1.0;
+  vColor = pcolor;
+  vColor2 = pcolor;
+
+  gl_PointSize = 25.0;
+
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(planetPos, 1.0);
+}
+
+</script>
+
+
+      <script type="x-shader/x-fragment" id="fragmentShaderPosition">
+#ifdef GL_ES
+      precision highp float;
 #endif
 uniform sampler2D texturePositions;
 uniform sampler2D textureVelocities;
 uniform vec2 resolution;
-uniform float dist_reduction;
+uniform float planetCount;
+uniform float minDist;
+uniform float distReduction;
+uniform float speedReduction;
 varying vec3 texcoord;
 #define SQPLANETF float(SQPLANET)
 #define VEC4PERPLANETF float(VEC4PERPLANET)
-      
+
 void main( void ) {
   vec2 p = gl_FragCoord.xy / resolution;
   vec2 pPlanet = vec2(p.x, p.y);
@@ -554,27 +590,78 @@ void main( void ) {
   vec3 planetPos = texture2D(texturePositions, pPlanet).xyz;
   vec3 planetVelocity = texture2D(textureVelocities, pPlanet).xyz;
 
-  vec3 c = vec3(0.0);
+  planetVelocity = planetVelocity * 2.0 - 1.0;
+
+  planetVelocity /= speedReduction;
+
+  vec3 newPosition = planetPos + planetVelocity;
+
+  gl_FragColor = vec4(newPosition, 1.0);
+}
+
+      </script>
+
+      <script type="x-shader/x-fragment" id="fragmentShaderVelocity">
+#ifdef GL_ES
+      precision highp float;
+#endif
+uniform sampler2D texturePositions;
+uniform sampler2D textureVelocities;
+uniform vec2 resolution;
+uniform float planetCount;
+uniform float minDist;
+uniform float distReduction;
+varying vec3 texcoord;
+#define SQPLANETF float(SQPLANET)
+#define VEC4PERPLANETF float(VEC4PERPLANET)
+
+void main( void ) {
+  vec2 p = gl_FragCoord.xy / resolution;
+
+  vec3 planetPos = texture2D(texturePositions, p).xyz;
+  vec3 planetVelocity = texture2D(textureVelocities, p).xyz;
+
+  vec3 delta = vec3(0.0);
   for (float x = 0.0; x < SQPLANETF; x += 1.0) {
     for (float y = 0.0; y < SQPLANETF; y += 1.0) {
       vec2 tpos = vec2(x / SQPLANETF, y / SQPLANETF);
       vec3 planet2Pos = texture2D(texturePositions, tpos).xyz;
       vec3 diff = planet2Pos - planetPos;
       float dist = length(diff);
-      dist /= dist_reduction;
-      c += diff * dist;
+      dist *= dist;
+      //float F = 1.0 / (minDist + dist) / distReduction / planetCount;
+      float F = 1.0 / (minDist + dist) / distReduction / planetCount;
+      delta += diff * F;
     }
   }
+  /*vec3 newPos = planetPos + (planetVelocity * 2.0 - 1.0) / speedReduction;
+  if (newPos.x < 0.0 || newPos.x >= 1.0) {
+    planetVelocity.x =
+  }*/
 
-  //gl_FragColor = vec4(vec, 1.0);
-  //gl_FragColor = vec4(planetVelocity + c, 1.0);
-  gl_FragColor = vec4(planetVelocity, 1.0);
-  //gl_FragColor = pack_depth(planetPos.x);
-  //gl_FragColor = vec4(planetVelocity + c, 1.0);
-  //gl_FragColor = vec4(pPlanet.x, pPlanet.y, 0.5, 1.0);
+  gl_FragColor = vec4(planetVelocity + delta, 1.0);
+  //gl_FragColor = vec4(planetVelocity, 1.0);
 }
-      
+
       </script>
+    <!-- pass through fragment shader -->
+    <script type="x-shader/x-fragment" id="fragmentShaderPassThrough">
+
+      uniform vec2 resolution;
+      uniform float time;
+      uniform sampler2D passTexture;
+
+      void main() {
+
+        vec2 uv = gl_FragCoord.xy / resolution.xy;
+
+        vec3 color = texture2D(passTexture, uv).xyz;
+
+        gl_FragColor = vec4(color, 1.0);
+
+      }
+    </script>
+    <!-- end pass through shaders -->
       <script type="x-shader/x-fragment" id="fragment_shader_screen">
 #ifdef GL_ES
       precision mediump float;
@@ -584,7 +671,7 @@ void main( void ) {
       uniform sampler2D planetsTexture;
       uniform vec2 resolution;
       varying vec3 texcoord;
-      
+
       void main( void ) {
         vec2 position = gl_FragCoord.xy / resolution; //texcoord.xy;
         vec4 old = texture2D(backbuffer, position);
@@ -609,7 +696,7 @@ void main( void ) {
           gl_FragColor = vec4(old.rgb * 1.0, 1.0);
           //gl_FragColor = vec4(old.rgb * 0.99, 1.0);
         }
-        
+
         const float sqPlanet = 25.0;
         vec3 c = vec3(0.0);
         for (float x = 0.0; x < sqPlanet; x += 2.0) {
@@ -630,12 +717,13 @@ void main( void ) {
         } else {
           gl_FragColor = old*0.99 + vec4(c, 1.0);
         }*/
-        
+
         //}
       }
       </script>
   <!-- End Shaders -->
   <!--<script type="text/javascript" src="index.js"></script>-->
   <script type="text/javascript" src="bundle.js"></script>
+  <input type=button value="Render" onclick="window.renderCompute();"/>
   </body>
 </html>
