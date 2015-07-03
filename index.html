@@ -66,16 +66,28 @@
       {
         vec2 mid = vec2(0.5, 0.5);
         float d = length(gl_PointCoord - mid);
-        float r = 0.1 / pow(d, 1.0);
+        float r = 0.1 / pow(d, 2.0);
+        //float r = 1.0 / (1.0 - d); //0.01 / pow(0.5 - d, 1.0);
         if (ADDITIVE) {
           r = 0.001 / pow(d, 2.0);
         }
         float alpha = 0.0;
-        if (d < 0.5) {
+        const float outer = 0.5;
+        if (d < outer) {
+          //alpha = 1.0 - d;
           alpha = 1.0 - d;
+          r = 1.0 - d;
           if (ADDITIVE) {
             alpha *= r;
           }
+          const float inner = 0.3;
+          /*if (d < inner) {
+            alpha = 0.0;
+          } else {
+            d = (d - inner) / (outer - inner) - 1.0;
+            r = 0.01 / pow(d, 2.0);
+          }*/
+        } else {
         }
         //vec3 rgb = mix(vColor, vColor2, r)*(1.0-d);
         vec3 rgb = vColor * r; //(0.5 - d);

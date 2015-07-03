@@ -2,18 +2,20 @@
 
 // noprotect
 
-var Config = function() {
+var Config = function () {
   this.planetCount = 5;
-  this.starCount = 5;
+  this.starCount = 25;
   this.maxSpeed = 0.01;
-  //this.minSpeed = 0.001;
-  this.dist_reduction = 1.0e5;
+  this.minSpeed = 0.001;
+  this.distReduction = 1.0e5;
+  this.starDistReduction = 1.0e5;
   this.speed_reduction= 1.0;
   this.star_speed_reduction = 0.1;
   //this.minDist = 0.001;
-  this.trailLength = 100;
+  this.trailLength = 0;
   this.starTrailLength = 1;
-  this.randomWalk = true;
+  this.randomWalk = false;
+  this.useParentColor = true;
   this.useBackBuffer = false;
   this.useShader = true;
   this.useTubes = false;
@@ -22,7 +24,7 @@ var Config = function() {
   this.useMeshes = !this.useTubes && !this.useParticles;
   this.useParticleTrail = true;
   this.usePTrailOpacity = false;
-  this.radiusScale = 1.0;
+  this.radiusScale = 0.4;
   this.usePlanetRadius = false;
   this.SCALE = 20;
   this.starScale = 1.0 / (1.0 * this.SCALE);
@@ -118,7 +120,7 @@ var ComputeShader = function() {
   this.material = 
     new THREE.ShaderMaterial({
       uniforms: {
-        dist_reduction: { type: "f", value: config.dist_reduction },
+        distReduction: { type: "f", value: config.distReduction },
         planetsTexture: { type: "t", value: null  },
         resolution: { type: "v2", value: new THREE.Vector2(tw, th) }
       },
@@ -348,7 +350,8 @@ var createPlanet = function(index) {
       g: Math.random(),
       b: Math.random()
     },
-    isStar: false
+    isStar: false,
+    speed: 0.0
   };
   return planet;
 };
@@ -431,34 +434,40 @@ var createWalls = function() {
   planeTop.position.y = config.maxY;
   planeTop.rotateX( Math.PI / 2 );
   scene.add( planeTop );
+  walls.push( planeTop );
 
   var planeBottom = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
   planeBottom.position.y = -config.maxY;
   planeBottom.rotateX( -Math.PI / 2 );
   scene.add( planeBottom );
+  walls.push( planeBottom );
   
   var planeBack = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
   planeBack.position.z = -config.maxZ;
   planeBack.position.y = 0.0;
   scene.add( planeBack );
+  walls.push( planeBack );
   
   var planeFront = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
   planeFront.position.z = config.maxZ;
   planeFront.position.y = 0.0;
   planeFront.rotateY( Math.PI );
   scene.add( planeFront );
+  walls.push( planeFront );
   
   var planeRight = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
   planeRight.position.x = config.maxX;
   planeRight.position.y = 0.0;
   planeRight.rotateY( - Math.PI / 2 );
   scene.add( planeRight );
+  walls.push( planeRight );
   
   var planeLeft = new THREE.Mesh( planeGeo, new THREE.MeshPhongMaterial( { color: wallColor } ) );
   planeLeft.position.x = -config.maxX;
   planeLeft.position.y = 0.0;
   planeLeft.rotateY( Math.PI / 2 );
   scene.add( planeLeft );
+  walls.push( planeLeft );
 };
 
 var createLights = function() {
@@ -539,7 +548,12 @@ var updatePlanets = function() {
                          pw(diff.y, 2.0) +
                          pw(diff.z, 2.0));
     var F = p1.mass * p2.mass * w;
-    F = dist / config.dist_reduction;
+    if (p1.isStar || p2.isStar) {
+      //F /= 100.0; //((1.0 + dist) * config.starDistReduction);
+      F = p1.parent.speed * dist / config.starDistReduction;
+    } else {
+      F = dist / config.distReduction;
+    }
     vs[p1.index].x += (diff.x * F);
     vs[p1.index].y += (diff.y * F);
     vs[p1.index].z += (diff.z * F);
@@ -566,10 +580,17 @@ var updatePlanets = function() {
                           planet.velocity.y * planet.velocity.y + 
                           planet.velocity.z * planet.velocity.z
                          );
+      planet.speed = speed;
       if (speed > config.maxSpeed) {
         planet.velocity.x *= (config.maxSpeed / speed);
         planet.velocity.y *= (config.maxSpeed / speed);
         planet.velocity.z *= (config.maxSpeed / speed);
+        planet.speed = config.maxSpeed;
+      } else if (speed < config.minSpeed) {
+        planet.velocity.x *= (config.minSpeed / speed);
+        planet.velocity.y *= (config.minSpeed / speed);
+        planet.velocity.z *= (config.minSpeed / speed);
+        planet.speed = config.minSpeed;
       }
     //}
   }
@@ -722,7 +743,7 @@ var RenderTool = function() {
         mesh.material.uniforms.time !== undefined) {
       mesh.material.uniforms.time.value = timeVal + p.index * 637;
       var color = p.color;
-      if (p.isStar) {
+      if (p.isStar && config.useParentColor) {
         color = p.parent.color;
       }
       mesh.material.uniforms.color.value =
@@ -744,6 +765,17 @@ var RenderTool = function() {
     if (oldConfig.planetCount != config.planetCount ||
         oldConfig.starCount != config.starCount) {
       createPlanets();
+    }
+    if (oldConfig.useBackBuffer != config.useBackBuffer) {
+      if (config.useBackBuffer) {
+        for (var wall of walls) {
+          scene.remove(wall);
+        }
+      } else {
+        for (var wall of walls) {
+          scene.add(wall);
+        }
+      }
     }
     if (config.useTubes) {
       for (var tube of oldTubes) {
@@ -794,7 +826,11 @@ var RenderTool = function() {
         if (config.usePlanetRadius) {
           size *= p.radius;
         }
-        particles.add(pos, size, p.color, p.color2);
+        var color = p.color;
+        if (p.isStar && config.useParentColor) {
+          color = p.parent.color;
+        }
+        particles.add(pos, size, color, p.color2);
       }
       if (config.useMeshes) {
         updateMeshes(p, timeVal);
@@ -831,6 +867,7 @@ var RenderTool = function() {
 
 var planets = [];
 var edges = [];
+var walls = [];
 var meshMakers = [
   //MeshMaker.createMeshMaker('#fragmentshader1'),
   MeshMaker.createMeshMaker('#fragmentshader2'),
