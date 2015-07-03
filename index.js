@@ -1,10 +1,12 @@
-/*jslint browser: true, indent: 2, es6: true */
+/*jslint browser: true, es6: true */
 
 /*global
   $, THREE, Stats, dat
 */
 
 // noprotect
+
+"use strict";
 
 var Config = function () {
   this.planetCount = 5;
@@ -56,7 +58,7 @@ var ComputeShader = function () {
   // XXX: for debug only
   document.body.appendChild(this.renderer.domElement);
 
-  this.camera =  new THREE.PerspectiveCamera(100, outWidth / outHeight, 0.1, 1000);
+  this.camera = new THREE.PerspectiveCamera(100, outWidth / outHeight, 0.1, 1000);
   this.camera.position.z = 1;
 
   this.scene = new THREE.Scene();
@@ -69,7 +71,7 @@ var ComputeShader = function () {
     new THREE.ShaderMaterial({
       uniforms: {
         distReduction: { type: "f", value: window.planetsConfig.distReduction },
-        planetsTexture: { type: "t", value: null  },
+        planetsTexture: { type: "t", value: null },
         resolution: { type: "v2", value: new THREE.Vector2(tw, th) }
       },
       vertexShader: $("#vertexshader").text(),
@@ -104,7 +106,7 @@ var ComputeShader = function () {
     return res;
   };
 
-  this.decodeFloat = function (rgba_depth) {
+  this.decodeFloat = function (rgbaDepth) {
     var
       base = 255.0,
       bitShift = [
@@ -114,10 +116,10 @@ var ComputeShader = function () {
         1.0
       ],
       depth =
-      rgba_depth[0] * bitShift[0] +
-      rgba_depth[1] * bitShift[1] +
-      rgba_depth[2] * bitShift[2] +
-      rgba_depth[3] * bitShift[3];
+      rgbaDepth[0] * bitShift[0] +
+      rgbaDepth[1] * bitShift[1] +
+      rgbaDepth[2] * bitShift[2] +
+      rgbaDepth[3] * bitShift[3];
     return depth;
   };
 
@@ -128,7 +130,7 @@ var ComputeShader = function () {
       gOffset = 1,
       bOffset = 2,
       aOffset = 3,
-      b = new Uint8Array(tw*th*rs);
+      b = new Uint8Array(tw * th * rs);
     for (var planet of window.planetsState.planets) {
       var i = planet.index * vec4PerPlanet * rs;
       var position = planet.position;
@@ -181,7 +183,7 @@ var ComputeShader = function () {
     // http://aras-p.info/blog/2009/07/30/encoding-floats-to-rgba-the-final/
     // http://stackoverflow.com/questions/17217936/how-can-i-access-imagedata-from-a-rendertarget
   };
-  
+
   this.getImageData = function (image) {
     var canvas = document.createElement("canvas");
     canvas.width = image.width;
@@ -192,7 +194,7 @@ var ComputeShader = function () {
 
     return context.getImageData(0, 0, image.width, image.height);
   };
-  
+
   this.compute = function () {
     var texture = this.genTexture();
     this.material.uniforms.planetsTexture.value = texture;
@@ -204,21 +206,21 @@ var ComputeShader = function () {
 
 
 var MeshMaker = function (shader) {
-  
-  var scale = 1.0;
+
+  var
+    scale = 1.0,
+    length = 1.0;
   //this.geometry = new THREE.BoxGeometry( 1/scale, 1/scale, 1/scale );
   //this.geometry = new THREE.TorusGeometry(0.5/scale, 0.25/scale, 16, 100);
   //this.geometry = new THREE.SphereGeometry( 0.03, 50, 50);
-  this.geometry = new THREE.SphereGeometry( 0.3, 50, 50);
-  var length = 1.0;
+  this.geometry = new THREE.SphereGeometry( 0.3 / scale, 50, 50);
 
   //this.geometry = new THREE.CylinderGeometry( 0.3, 0.3, length, 50);
   // rotates the cylinder to initial position so it will rotate correctly with velocity
   //this.geometry.applyMatrix( new THREE.Matrix4().makeTranslation( 0, length / 2, 0 ) );
   //this.geometry.applyMatrix( new THREE.Matrix4().makeRotationX( Math.PI / 2 ) );
-
   //this.geometry = new THREE.IcosahedronGeometry(0.1);
- 
+
   this.initMaterial = function () {
     var imgTexture = THREE.ImageUtils.loadTexture( "textures/sprite.png");
     //imgTexture.repeat.set( 1, 1 );
@@ -226,19 +228,25 @@ var MeshMaker = function (shader) {
     //imgTexture.anisotropy = 16;
     this.imgTexture = imgTexture;
 
-    var shininess = 50, specular = 0x333333, bumpScale = 1, shading = THREE.SmoothShading;
-    
+    var shininess = 50, specular = 0x111111, bumpScale = 1, shading = THREE.SmoothShading;
+
     var imgTexture2 = THREE.ImageUtils.loadTexture( "textures/moon_1024.jpg");
     imgTexture2.wrapS = imgTexture2.wrapT = THREE.RepeatWrapping;
     imgTexture2.anisotropy = 16;
     this.imgTexture2 = imgTexture2;
-    
+
     //this.material = new THREE.MeshPhongMaterial( { map: imgTexture, bumpMap: imgTexture, bumpScale: bumpScale, color: 0xffffff, specular: specular, shininess: shininess, shading: shading } );
-    this.material = new THREE.MeshPhongMaterial( { color: 0x2194ce, specular: 0x111111, shininess: 30 } );
+    this.material = new THREE.MeshPhongMaterial({
+      color: 0x2194ce,
+      bumpScale: bumpScale,
+      specular: specular,
+      shininess: shininess,
+      shading: shading
+    });
   };
 
   this.initMaterial();
- 
+
   this.initShader = function () {
     this.shaderMaterial = new THREE.ShaderMaterial({
       uniforms: {
@@ -247,21 +255,22 @@ var MeshMaker = function (shader) {
         color: { type: "c", value: new THREE.Color(1.0, 1.0, 1.0) },
         material: { type: "t", value: this.imgTexture }
       },
-      vertexShader:   $("#vertexshader").text(),
+      vertexShader: $("#vertexshader").text(),
       fragmentShader: shader,
       transparent: true
     });
-  }
-  
-  this.createMesh = function () {  
+  };
+
+  this.createMesh = function () {
+    var mesh;
     if (window.planetsConfig.useShader) {
-      var mesh = new THREE.Mesh(this.geometry, this.shaderMaterial.clone());
+      mesh = new THREE.Mesh(this.geometry, this.shaderMaterial.clone());
     } else {
-      var mesh = new THREE.Mesh(this.geometry, this.material);
+      mesh = new THREE.Mesh(this.geometry, this.material.clone());
     }
     return mesh;
   };
-    
+
 };
 MeshMaker.createMeshMaker = function (fragmentId) {
   var shader = $(fragmentId).text();
@@ -309,42 +318,13 @@ var createPlanet = function (index) {
   return planet;
 };
 
-var createPlanets = function () {
-  var planetCount = window.planetsState.planets.filter((p) => !p.isStar).length;
-  console.log("createPlanets", planetCount);
-
-  for (var i = planetCount; i < window.planetsConfig.planetCount; i++) {
-    var planet = createPlanet(window.planetsState.planets.length);
-    window.planetsState.planets.push(planet);
-    if (window.planetsConfig.useTubes) {
-      planet.tubeMaterial = window.planetsState.meshMakers[planet.index % window.planetsState.meshMakers.length].shaderMaterial.clone();
-    }
-    for (var t = 0; t < window.planetsConfig.trailLength; t++) {
-      var mesh = window.planetsState.meshMakers[planet.index % window.planetsState.meshMakers.length].createMesh();
-      planet.meshes.push(mesh);
-    }
-  }
-  
-  // add main planet window.planetsState.edges
-  window.planetsState.edges = [];
-  for (var p1 of window.planetsState.planets) {
-    for (var p2 of window.planetsState.planets) {
-      if (p1.isStar || p2.isStar) continue;
-      if (p1 == p2) continue;
-      
-      var w = 1.0;
-      var edge = [p1, p2, w];
-      window.planetsState.edges.push(edge);
-    }
-  }
-  createStars();
-};
-
 var createStars = function () {
   var starPlanets = [];
   var index = window.planetsState.planets.length; //window.planetsConfig.planetCount;
   for (var planet of window.planetsState.planets) {
-    if (planet.isStar) continue;
+    if (planet.isStar) {
+      continue;
+    }
     if (planet.stars === undefined) {
       planet.stars = [];
     }
@@ -366,7 +346,9 @@ var createStars = function () {
     // add star formation window.planetsState.edges
     for (var s2 of planet.stars) {
       for (var s3 of planet.stars) {
-        if (s2 == s3) continue;
+        if (s2 === s3) {
+          continue;
+        }
         var w = 1.0e5;
         var edge = [s2, s3, w];
         window.planetsState.edges.push(edge);
@@ -378,8 +360,42 @@ var createStars = function () {
   }
 };
 
+var createPlanets = function () {
+  var planetCount = window.planetsState.planets.filter((p) => !p.isStar).length;
+
+  for (var i = planetCount; i < window.planetsConfig.planetCount; i++) {
+    var planet = createPlanet(window.planetsState.planets.length);
+    window.planetsState.planets.push(planet);
+    if (window.planetsConfig.useTubes) {
+      planet.tubeMaterial = window.planetsState.meshMakers[planet.index % window.planetsState.meshMakers.length].shaderMaterial.clone();
+    }
+    for (var t = 0; t < window.planetsConfig.trailLength; t++) {
+      var mesh = window.planetsState.meshMakers[planet.index % window.planetsState.meshMakers.length].createMesh();
+      planet.meshes.push(mesh);
+    }
+  }
+
+  // add main planet window.planetsState.edges
+  window.planetsState.edges = [];
+  for (var p1 of window.planetsState.planets) {
+    for (var p2 of window.planetsState.planets) {
+      if (p1.isStar || p2.isStar) {
+        continue;
+      }
+      if (p1 === p2) {
+        continue;
+      }
+
+      var w = 1.0;
+      var edge = [p1, p2, w];
+      window.planetsState.edges.push(edge);
+    }
+  }
+  createStars();
+};
+
 var createWalls = function () {
-  var planeGeo = new THREE.PlaneGeometry( window.planetsConfig.scale*2.0 + 0.1, window.planetsConfig.scale*2.0 + 0.1 );
+  var planeGeo = new THREE.PlaneGeometry(window.planetsConfig.scale * 2.0 + 0.1, window.planetsConfig.scale * 2.0 + 0.1);
 
   var wallColor = 0x111111;
 
@@ -394,24 +410,24 @@ var createWalls = function () {
   planeBottom.position.y = -window.planetsConfig.maxY;
   planeBottom.rotateX(-Math.PI / 2);
   walls.push(planeBottom);
-  
+
   var planeBack = new THREE.Mesh(planeGeo, new THREE.MeshPhongMaterial({ color: wallColor }));
   planeBack.position.z = -window.planetsConfig.maxZ;
   planeBack.position.y = 0.0;
   walls.push(planeBack);
-  
+
   var planeFront = new THREE.Mesh(planeGeo, new THREE.MeshPhongMaterial({ color: wallColor }));
   planeFront.position.z = window.planetsConfig.maxZ;
   planeFront.position.y = 0.0;
   planeFront.rotateY(Math.PI);
   walls.push(planeFront);
-  
+
   var planeRight = new THREE.Mesh(planeGeo, new THREE.MeshPhongMaterial({ color: wallColor }));
   planeRight.position.x = window.planetsConfig.maxX;
   planeRight.position.y = 0.0;
-  planeRight.rotateY(- Math.PI / 2);
+  planeRight.rotateY(-Math.PI / 2);
   walls.push(planeRight);
-  
+
   var planeLeft = new THREE.Mesh(planeGeo, new THREE.MeshPhongMaterial({ color: wallColor }));
   planeLeft.position.x = -window.planetsConfig.maxX;
   planeLeft.position.y = 0.0;
@@ -444,7 +460,7 @@ var clamp = function (num, min, max) {
 
 var reflect = function (reduction, position, speed) {
   var sr = speed / reduction;
-  if (position + sr <= -1.0 || 
+  if (position + sr <= -1.0 ||
       position + sr >= 1.0) {
     if (position - sr <= -1.0 ||
         position - sr >= 1.0) {
@@ -466,17 +482,18 @@ var min = function (a, b) {
 };
 
 var euclid = function (p1, p2) {
-  xd = p2.x - p1.x;
-  yd = p2.y - p1.y;
-  ret = {
-    x: xd,
-    y: yd,
-    d: Math.sqrt(xd * xd + yd * yd)
-  };
+  var
+    xd = p2.x - p1.x,
+    yd = p2.y - p1.y,
+    ret = {
+      x: xd,
+      y: yd,
+      d: Math.sqrt(xd * xd + yd * yd)
+    };
   return ret;
 };
 
-var updatePlanets = function () {  
+var updatePlanets = function () {
   var vs = [];
   for (var p of window.planetsState.planets) {
     var ve = {
@@ -486,7 +503,7 @@ var updatePlanets = function () {
     };
     vs[p.index] = ve;
   }
-  
+
   // compute new velocities
   for (var edge of window.planetsState.edges) {
     var p1, p2, w;
@@ -494,10 +511,10 @@ var updatePlanets = function () {
     var diff = {
       x: (p2.position.x - p1.position.x),
       y: (p2.position.y - p1.position.y),
-      z: (p2.position.z - p1.position.z),
+      z: (p2.position.z - p1.position.z)
     };
     var pw = Math.pow;
-    var dist = (pw(diff.x, 2.0) + 
+    var dist = (pw(diff.x, 2.0) +
                          pw(diff.y, 2.0) +
                          pw(diff.z, 2.0));
     var F = p1.mass * p2.mass * w;
@@ -511,11 +528,11 @@ var updatePlanets = function () {
     vs[p1.index].y += (diff.y * F);
     vs[p1.index].z += (diff.z * F);
   }
-  
+
   // adjust velocities
   for (var planet of window.planetsState.planets) {
     var v = vs[planet.index];
-    
+
     // add random walk
     if (window.planetsConfig.randomWalk && !planet.isStar) {
       var rf = 500;
@@ -527,10 +544,10 @@ var updatePlanets = function () {
     planet.velocity.x += v.x;
     planet.velocity.y += v.y;
     planet.velocity.z += v.z;
-    
+
     //if (!planet.isStar) {
-      var speed = Math.sqrt(planet.velocity.x * planet.velocity.x + 
-                          planet.velocity.y * planet.velocity.y + 
+      var speed = Math.sqrt(planet.velocity.x * planet.velocity.x +
+                          planet.velocity.y * planet.velocity.y +
                           planet.velocity.z * planet.velocity.z
                          );
       planet.speed = speed;
@@ -547,7 +564,7 @@ var updatePlanets = function () {
       }
     //}
   }
-  
+
   // update positions
   for (var planet2 of window.planetsState.planets) {
     // store old position
@@ -561,10 +578,10 @@ var updatePlanets = function () {
         planet2.positions.shift();
       }
     }
-    
+
     // compute new
     var reduction = planet2.isStar ? window.planetsConfig.starSpeedReduction : window.planetsConfig.speedReduction;
-    [planet2.position.x, planet2.velocity.x] = reflect(reduction, planet2.position.x, planet2.velocity.x);    
+    [planet2.position.x, planet2.velocity.x] = reflect(reduction, planet2.position.x, planet2.velocity.x);
     [planet2.position.y, planet2.velocity.y] = reflect(reduction, planet2.position.y, planet2.velocity.y);
     [planet2.position.z, planet2.velocity.z] = reflect(reduction, planet2.position.z, planet2.velocity.z);
   }
@@ -572,7 +589,6 @@ var updatePlanets = function () {
 
 var Particles = function () {
   var geometry = new THREE.Geometry();
-  var currentIndex = 0;
 
   var material =
     new THREE.ShaderMaterial({
@@ -580,7 +596,7 @@ var Particles = function () {
         opacity: { type: "f", value: 1.0 }
       },
       attributes: {
-        psize:  { type: "f", value: [], needsUpdate: true },
+        psize: { type: "f", value: [], needsUpdate: true },
         pcolor: { type: "c", value: [], needsUpdate: true },
         pcolor2: { type: "c", value: [], needsUpdate: true }
       },
@@ -613,16 +629,18 @@ var Particles = function () {
     vsize[idx] = size;
     vcolor[idx] = color;
     vcolor2[idx] = color2;
-  }
+  };
+
   this.addToScene = function (scene) {
     scene.add(particleCloud);
-  }
+  };
+
   this.removeFromScene = function (scene) {
     scene.remove(particleCloud);
     geometry.dispose();
     material.dispose();
-  }
-}
+  };
+};
 
 var RenderTool = function () {
   var
@@ -630,7 +648,7 @@ var RenderTool = function () {
     oldTubes = [],
     particles = new Particles(),
     oldParticles = [],
-    oldConfig = jQuery.extend({}, window.planetsConfig),
+    oldConfig = $.extend({}, window.planetsConfig),
     scene,
     camera,
     screenScene,
@@ -689,7 +707,7 @@ var RenderTool = function () {
       new THREE.ShaderMaterial({
         uniforms: {
           backbuffer: { type: "t", value: rtBackBuffer1 },
-          screen: { type: "t", value: rtScreen  },
+          screen: { type: "t", value: rtScreen },
           planetsTexture: { type: "t", value: null },
           resolution: { type: "v2", value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
         },
@@ -722,14 +740,16 @@ var RenderTool = function () {
     };
   };
 
-  var createTube = function (p, mesh) {
+  var createTube = function (p) {
     var path = [];
     for (var pos of p.positions) {
       pos = mapPositionToScene(p, pos);
-      var pos_vec3 = new THREE.Vector3(pos.x, pos.y, pos.z);
-      path.push(pos_vec3);
+      var posVec3 = new THREE.Vector3(pos.x, pos.y, pos.z);
+      path.push(posVec3);
     }
-    if (path.length == 0) return;
+    if (path.length === 0) {
+      return;
+    }
     path = new THREE.SplineCurve3(path);
     var geometry = new THREE.TubeGeometry(
         path,  //path
@@ -747,12 +767,14 @@ var RenderTool = function () {
     var t = p.lastMesh;
     var mesh = p.meshes[t];
     scene.add(mesh);
-    if (mesh === undefined) return;
+    if (mesh === undefined) {
+      return;
+    }
     var pos = mapPositionToScene(p, p.position);
     mesh.position.set(pos.x, pos.y, pos.z);
-    
+
     var dir = new THREE.Vector3(
-                mesh.position.x + p.velocity.x, 
+                mesh.position.x + p.velocity.x,
                 mesh.position.y + p.velocity.y,
                 mesh.position.z + p.velocity.z);
     mesh.lookAt(dir);
@@ -765,41 +787,43 @@ var RenderTool = function () {
     mesh.scale.y = scale;
     mesh.scale.z = scale;
 
+    var color = p.color;
+    if (p.isStar && window.planetsConfig.useParentColor) {
+      color = p.parent.color;
+    }
     if (mesh.material.uniforms !== undefined &&
         mesh.material.uniforms.time !== undefined) {
       mesh.material.uniforms.time.value = timeVal + p.index * 637;
-      var color = p.color;
-      if (p.isStar && window.planetsConfig.useParentColor) {
-        color = p.parent.color;
-      }
       mesh.material.uniforms.color.value =
-        new THREE.Color(color.r, 
+        new THREE.Color(color.r,
                         color.g,
                         color.b);
+    }
+    if (mesh.material.color !== undefined) {
+      mesh.material.color = color;
     }
     p.lastMesh = (p.lastMesh + 1) % p.meshes.length;
   };
 
   this.render = function () {
-    var firstRender = (renderCount == 0);
+    var firstRender = (renderCount === 0);
     renderCount += 1;
     var i = 0;
     var newTime = (new Date().getTime()) / 1000.0;
     var timeVal = newTime - window.planetsState.startTime;
-    var sc = (Math.sin(timeVal) + 1.0) * 20.0 + 10.0;
-    //camera.position.z = sc;
-    //camera.rotation.z = Math.sin(timeVal)*0.1;
-    if (oldConfig.planetCount != window.planetsConfig.planetCount ||
-        oldConfig.starCount != window.planetsConfig.starCount) {
+
+    if (oldConfig.planetCount !== window.planetsConfig.planetCount ||
+        oldConfig.starCount !== window.planetsConfig.starCount) {
       createPlanets();
     }
-    if (firstRender || oldConfig.useBackBuffer != window.planetsConfig.useBackBuffer) {
+    if (firstRender || oldConfig.useBackBuffer !== window.planetsConfig.useBackBuffer) {
+      var wall;
       if (window.planetsConfig.useBackBuffer) {
-        for (var wall of walls) {
+        for (wall of walls) {
           scene.remove(wall);
         }
       } else {
-        for (var wall of walls) {
+        for (wall of walls) {
           scene.add(wall);
         }
       }
@@ -816,18 +840,19 @@ var RenderTool = function () {
     }
 
     if (window.planetsConfig.useParticles) {
+      var pt;
       if (!window.planetsConfig.useParticleTrail) {
         particles.removeFromScene(scene);
-        for (var pt of oldParticles) {
+        for (pt of oldParticles) {
           pt.removeFromScene(scene);
           oldParticles = [];
         }
       } else {
         oldParticles.push(particles);
-        var i = 0;
-        for (var pt of oldParticles) {
+        var ptIndex = 0;
+        for (pt of oldParticles) {
           if (window.planetsConfig.usePTrailOpacity) {
-            pt.setOpacity(i / oldParticles.length);
+            pt.setOpacity(ptIndex / oldParticles.length);
           } else {
             pt.setOpacity(1.0);
           }
@@ -841,38 +866,40 @@ var RenderTool = function () {
       }
     }
 
-    for (var i = 0; i < window.planetsState.planets.length; i++) {
-      var p = window.planetsState.planets[i];
+    for (var planet of window.planetsState.planets) {
       if (window.planetsConfig.useTubes) {
-        createTube(p);
+        createTube(planet);
       }
       if (window.planetsConfig.useParticles) {
-        var pos = mapPositionToScene(p, p.position);
+        var pos = mapPositionToScene(planet, planet.position);
         pos = new THREE.Vector3(pos.x, pos.y, pos.z);
         var size = window.planetsConfig.radiusScale * 20.0;
         if (window.planetsConfig.usePlanetRadius) {
-          size *= p.radius;
+          size *= planet.radius;
         }
-        var color = p.color;
-        if (p.isStar && window.planetsConfig.useParentColor) {
-          color = p.parent.color;
+        var color = planet.color;
+        if (planet.isStar && window.planetsConfig.useParentColor) {
+          color = planet.parent.color;
         }
-        particles.add(pos, size, color, p.color2);
+        particles.add(pos, size, color, planet.color2);
         particles.addToScene(scene);
       }
       if (window.planetsConfig.useMeshes) {
-        updateMeshes(p, timeVal);
-      } else {
-        if (oldConfig.useMeshes) {
-          for (var p of window.planetsState.planets) {
-            for (var mesh of p.meshes) {
-              scene.remove(mesh);
-            }
+        updateMeshes(planet, timeVal);
+      }
+    }
+
+    // remove meshes when config says so
+    if (!window.planetsConfig.useMeshes) {
+      if (oldConfig.useMeshes) {
+        for (planet of window.planetsState.planets) {
+          for (var mesh of planet.meshes) {
+            scene.remove(mesh);
           }
         }
       }
     }
-    
+
     if (!window.planetsConfig.useBackBuffer) {
       renderer.render(scene, camera);
     } else {
@@ -880,28 +907,26 @@ var RenderTool = function () {
       renderer.render(screenScene, screenCamera, null, false);
       renderer.render(screenScene, screenCamera, rtBackBuffer1, false);
     }
-    
+
     // swap buffers
     var a = rtBackBuffer2;
     rtBackBuffer2 = rtBackBuffer1;
     rtBackBuffer1 = a;
     screenMaterial.uniforms.backbuffer.value = rtBackBuffer2;
-    
+
     stats.update();
-    oldConfig = jQuery.extend({}, window.planetsConfig)
+    oldConfig = $.extend({}, window.planetsConfig);
     requestAnimationFrame(() => this.render());
   };
 };
 
 var main = function () {
-  "use strict";
-
   window.planetsState = {
     planets: [],
     edges: [],
     meshMakers: [
       //MeshMaker.createMeshMaker("#fragmentshader1"),
-      MeshMaker.createMeshMaker("#fragmentshader2"),
+      MeshMaker.createMeshMaker("#fragmentshader2")
       //MeshMaker.createMeshMaker("#fragmentshader3"),
       //MeshMaker.createMeshMaker("#fragmentshader4"),
       //MeshMaker.createMeshMaker("#fragmentshader5"),
