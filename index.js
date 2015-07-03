@@ -54,8 +54,7 @@ var ComputeShader = function () {
     floatsPerPlanet = 4.0,
     tw = sq,
     outHeight = sq,
-    outWidth = sq,
-    fShader;
+    outWidth = sq;
 
   this.renderer = new THREE.WebGLRenderer();
   this.renderer.setSize(outWidth, outHeight);
@@ -73,7 +72,7 @@ var ComputeShader = function () {
     return;
   }
 
-  if (gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS) == 0) {
+  if (gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS) === 0) {
     alert("No support for vertex shader textures!");
     return;
   }
