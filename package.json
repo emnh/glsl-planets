@@ -1,6 +1,7 @@
 {
   "name": "glsl-planets",
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "license": "GPL-2.0",
   "repository" : {
     "type" : "git",
     "url" : "http://github.com/emnh/glsl-planets.git"
@@ -9,9 +10,12 @@
     "browserify": "*",
     "babelify": "*"
   },
+  "devDependencies": {
+    "jslint": "*"
+  },
   "engines": {
-    "node": "0.10.x",
-    "npm": "2.3.x"
+    "node": "0.12.x",
+    "npm": "2.x.x"
   },
   "scripts": {
   }
