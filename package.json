@@ -11,7 +11,9 @@
     "babelify": "*"
   },
   "devDependencies": {
-    "jslint": "*"
+    "jslint": "*",
+    "eslint": "*",
+    "babel-eslint": "*"
   },
   "engines": {
     "node": "0.12.x",
