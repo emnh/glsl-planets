@@ -8,7 +8,7 @@
 
 "use strict";
 
-var Config = function () {
+const Config = function () {
   this.planetCount = 5;
   this.starCount = 25;
   this.maxSpeed = 1.00;
@@ -18,7 +18,6 @@ var Config = function () {
   this.starDistReduction = 30;
   this.speedReduction = 100.0;
   this.starSpeedReduction = 0.1;
-  //this.minDist = 0.001;
   this.trailLength = 1;
   this.starTrailLength = 1;
   this.randomWalk = false;
@@ -139,13 +138,14 @@ var ComputeShader = function () {
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.camera.position.z = 1;
 
+    const controls = new THREE.OrbitControls(this.camera, compute.renderer.domElement);
+
     this.geometry = new THREE.Geometry();
 
     this.material = new THREE.ShaderMaterial({
       uniforms: {
         texturePositions: { type: "t", value: null },
         opacity: { type: "f", value: 1.0 },
-        //resolution: { type: "v2", value: new THREE.Vector2(tw, th) }
         resolution: { type: "v2", value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
       },
       attributes: {
