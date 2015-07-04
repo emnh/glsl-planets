@@ -1,14 +1,15 @@
 /*jslint browser: true, es6: true */
 
 /*global
-  $, THREE, Stats, dat
+  $, THREE, Stats, dat, sweetAlert
 */
 
 // noprotect
 
-'use strict';
+// babel will add it for us
+// 'use strict';
 
-const Config = function () {
+const Config = function() {
   this.planetCount = 5;
   this.starCount = 25;
   this.maxSpeed = 1.00;
@@ -46,14 +47,13 @@ window.planetsConfig = new Config();
 
 const gpgpuVersion = false;
 
-const ComputeShader = function () {
-  const
-    sq = Math.ceil(Math.sqrt(window.planetsState.planets.length)),
-    th = sq,
-    floatsPerPlanet = 4.0,
-    tw = sq,
-    outHeight = sq,
-    outWidth = sq;
+const ComputeShader = function() {
+  const sq = Math.ceil(Math.sqrt(window.planetsState.planets.length));
+  const th = sq;
+  const floatsPerPlanet = 4.0;
+  const tw = sq;
+  const outHeight = sq;
+  const outWidth = sq;
 
   this.renderer = new THREE.WebGLRenderer();
   this.renderer.setSize(outWidth, outHeight);
@@ -67,12 +67,12 @@ const ComputeShader = function () {
   const gl = this.renderer.getContext();
 
   if (!gl.getExtension('OES_texture_float')) {
-    alert('No OES_texture_float support for float textures!');
+    sweetAlert('No OES_texture_float support for float textures!', 'error');
     return;
   }
 
   if (gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS) === 0) {
-    alert('No support for vertex shader textures!');
+    sweetAlert('No support for vertex shader textures!', 'error');
     return;
   }
 
@@ -127,7 +127,7 @@ const ComputeShader = function () {
 
   const plane = new THREE.PlaneBufferGeometry(2, 2);
   this.mesh = new THREE.Mesh(plane, this.passThroughMaterial);
-  //this.mesh.position.z = -1;
+  // this.mesh.position.z = -1;
   this.scene.add(this.mesh);
 
   const compute = this;
@@ -167,16 +167,15 @@ const ComputeShader = function () {
         const yf = y / th;
         const pt = new THREE.Vector3(xf, yf, 0.0);
         vertices.push(pt);
-        const
-          r = Math.random(),
-          g = Math.random(),
-          b = Math.random();
+        const r = Math.random();
+        const g = Math.random();
+        const b = Math.random();
         const color = new THREE.Color(r, g, b);
         pColor.push(color);
       }
     }
 
-    //const material = new THREE.PointCloudMaterial( { size: 1, sizeAttenuation: false, alphaTest: 0.5, transparent: true } );
+    // const material = new THREE.PointCloudMaterial( { size: 1, sizeAttenuation: false, alphaTest: 0.5, transparent: true } );
     this.particleCloud = new THREE.PointCloud(this.geometry, this.material);
 
     const sphere = new THREE.SphereGeometry( 0.3, 50, 50);
@@ -188,7 +187,7 @@ const ComputeShader = function () {
       shading: THREE.SmoothShading
     });
     const mesh = new THREE.Mesh(sphere, smat);
-    //this.screenScene.add(mesh);
+    // this.screenScene.add(mesh);
 
     this.screenScene.add(this.particleCloud);
     this.screenScene.add(new THREE.AmbientLight(0x444444));
@@ -209,11 +208,10 @@ const ComputeShader = function () {
   this.rtVelocities1 = rt.clone();
   this.rtVelocities2 = rt.clone();
 
-  this.genTexture = function () {
-    const
-      rgbaSize = 4,
-      rawPositions = new Float32Array(tw * th * rgbaSize),
-      rawVelocities = new Float32Array(tw * th * rgbaSize);
+  this.genTexture = function() {
+    const rgbaSize = 4;
+    const rawPositions = new Float32Array(tw * th * rgbaSize);
+    const rawVelocities = new Float32Array(tw * th * rgbaSize);
     for (let planet of window.planetsState.planets) {
       let i = planet.index * floatsPerPlanet;
       const position = planet.position;
@@ -250,12 +248,9 @@ const ComputeShader = function () {
     tVelocities.needsUpdate = true;
 
     return [tPositions, tVelocities];
-    // resources:
-    // http://aras-p.info/blog/2009/07/30/encoding-floats-to-rgba-the-final/
-    // http://stackoverflow.com/questions/17217936/how-can-i-access-imagedata-from-a-rendertarget
   };
 
-  this.getImageData = function (image) {
+  this.getImageData = function(image) {
     const canvas = document.createElement('canvas');
     canvas.width = image.width;
     canvas.height = image.height;
@@ -266,7 +261,7 @@ const ComputeShader = function () {
     return context.getImageData(0, 0, image.width, image.height);
   };
 
-  this.render = function () {
+  this.render = function() {
     // set input textures from last round
     this.uniforms.texturePositions.value = this.rtPositions2;
     this.uniforms.textureVelocities.value = this.rtVelocities2;
@@ -296,7 +291,7 @@ const ComputeShader = function () {
     requestAnimationFrame(() => this.render());
   };
 
-  this.compute = function () {
+  this.compute = function() {
     const [tPositions, tVelocities] = this.genTexture();
 
     // copy positions texture
@@ -313,42 +308,44 @@ const ComputeShader = function () {
 
     this.render();
 
-    //const img = this.getImageData(this.renderer.domElement);
+    // const img = this.getImageData(this.renderer.domElement);
   };
 };
 
 
-const MeshMaker = function (shader) {
-
-  const
-    scale = 1.0,
-    length = 1.0;
-  //this.geometry = new THREE.BoxGeometry( 1/scale, 1/scale, 1/scale );
-  //this.geometry = new THREE.TorusGeometry(0.5/scale, 0.25/scale, 16, 100);
-  //this.geometry = new THREE.SphereGeometry( 0.03, 50, 50);
+const MeshMaker = function(shader) {
+  const scale = 1.0;
+  const length = 1.0;
+  // this.geometry = new THREE.BoxGeometry( 1/scale, 1/scale, 1/scale );
+  // this.geometry = new THREE.TorusGeometry(0.5/scale, 0.25/scale, 16, 100);
+  // this.geometry = new THREE.SphereGeometry( 0.03, 50, 50);
   this.geometry = new THREE.SphereGeometry( 0.3 / scale, 50, 50);
 
-  //this.geometry = new THREE.CylinderGeometry( 0.3, 0.3, length, 50);
+  // this.geometry = new THREE.CylinderGeometry( 0.3, 0.3, length, 50);
   // rotates the cylinder to initial position so it will rotate correctly with velocity
-  //this.geometry.applyMatrix( new THREE.Matrix4().makeTranslation( 0, length / 2, 0 ) );
-  //this.geometry.applyMatrix( new THREE.Matrix4().makeRotationX( Math.PI / 2 ) );
-  //this.geometry = new THREE.IcosahedronGeometry(0.1);
+  // this.geometry.applyMatrix( new THREE.Matrix4().makeTranslation( 0, length / 2, 0 ) );
+  // this.geometry.applyMatrix( new THREE.Matrix4().makeRotationX( Math.PI / 2 ) );
 
-  this.initMaterial = function () {
+  // this.geometry = new THREE.IcosahedronGeometry(0.1);
+
+  this.initMaterial = function() {
     const imgTexture = THREE.ImageUtils.loadTexture( 'textures/sprite.png');
-    //imgTexture.repeat.set( 1, 1 );
-    //imgTexture.wrapS = imgTexture.wrapT = THREE.RepeatWrapping;
-    //imgTexture.anisotropy = 16;
+    // imgTexture.repeat.set( 1, 1 );
+    // imgTexture.wrapS = imgTexture.wrapT = THREE.RepeatWrapping;
+    // imgTexture.anisotropy = 16;
     this.imgTexture = imgTexture;
 
-    const shininess = 50, specular = 0x111111, bumpScale = 1, shading = THREE.SmoothShading;
+    const shininess = 50;
+    const specular = 0x111111;
+    const bumpScale = 1;
+    const shading = THREE.SmoothShading;
 
     const imgTexture2 = THREE.ImageUtils.loadTexture( 'textures/moon_1024.jpg');
     imgTexture2.wrapS = imgTexture2.wrapT = THREE.RepeatWrapping;
     imgTexture2.anisotropy = 16;
     this.imgTexture2 = imgTexture2;
 
-    //this.material = new THREE.MeshPhongMaterial( { map: imgTexture, bumpMap: imgTexture, bumpScale: bumpScale, color: 0xffffff, specular: specular, shininess: shininess, shading: shading } );
+    // this.material = new THREE.MeshPhongMaterial( { map: imgTexture, bumpMap: imgTexture, bumpScale: bumpScale, color: 0xffffff, specular: specular, shininess: shininess, shading: shading } );
     this.material = new THREE.MeshPhongMaterial({
       color: 0x2194ce,
       bumpScale: bumpScale,
@@ -360,7 +357,7 @@ const MeshMaker = function (shader) {
 
   this.initMaterial();
 
-  this.initShader = function () {
+  this.initShader = function() {
     this.shaderMaterial = new THREE.ShaderMaterial({
       uniforms: {
         time: { type: 'f', value: 0.0 },
@@ -374,27 +371,27 @@ const MeshMaker = function (shader) {
     });
   };
 
-  this.createMesh = function () {
+  this.createMesh = function() {
     const mesh =
       window.planetsConfig.useShader ?
         new THREE.Mesh(this.geometry, this.shaderMaterial.clone()) :
         new THREE.Mesh(this.geometry, this.material.clone());
     return mesh;
   };
-
 };
-MeshMaker.createMeshMaker = function (fragmentId) {
+
+MeshMaker.createMeshMaker = function(fragmentId) {
   const shader = $(fragmentId).text();
   const meshMaker = new MeshMaker(shader);
   meshMaker.initShader();
   return meshMaker;
 };
 
-const randInit = function () {
+const randInit = function() {
   return Math.random() * 2.0 - 1.0;
 };
 
-const createPlanet = function (index) {
+const createPlanet = function(index) {
   const planet = {
     index: index,
     position: {
@@ -429,7 +426,7 @@ const createPlanet = function (index) {
   return planet;
 };
 
-const createStars = function () {
+const createStars = function() {
   const starPlanets = [];
   let index = window.planetsState.planets.length;
   for (let planet of window.planetsState.planets) {
@@ -460,7 +457,7 @@ const createStars = function () {
   }
 };
 
-const createPlanets = function () {
+const createPlanets = function() {
   const planetCount = window.planetsState.planets.filter((p) => !p.isStar).length;
 
   for (let i = planetCount; i < window.planetsConfig.planetCount; i++) {
@@ -476,7 +473,6 @@ const createPlanets = function () {
   }
 
   createStars();
-
 };
 
 const createEdges = function() {
@@ -507,10 +503,10 @@ const createEdges = function() {
   }
 };
 
-const createWalls = function () {
+const createWalls = function() {
   const planeGeo = new THREE.PlaneGeometry(window.planetsConfig.scale * 2.0 + 0.1, window.planetsConfig.scale * 2.0 + 0.1);
 
-  //const wallColor = 0x111111;
+  // const wallColor = 0x111111;
   const wallColor = 0xffffff;
 
   const walls = [];
@@ -551,67 +547,61 @@ const createWalls = function () {
   return walls;
 };
 
-const createLights = function () {
-  //scene.add(new THREE.AmbientLight(0x444444));
+const createLights = function() {
   const lights = [];
   const mainLight = new THREE.PointLight( 0xffffff, 1.5, 250 );
   mainLight.position.set(0.0, 0.0, window.planetsConfig.maxZ);
   lights.push(mainLight);
-
-  /*const directionalLight = new THREE.DirectionalLight( 0xffffff, 1 );
-  directionalLight.position.set( 0.5, 0.5, 0.5 ).normalize();
-  scene.add( directionalLight );*/
-
-  //const pointLight = new THREE.PointLight( 0xffffff, 2, 800 );
-  //scene.add( pointLight );
   return lights;
 };
 
 
-const clamp = function (num, min, max) {
-  return num < min ? min : (num > max ? max : num);
+const clamp = function(num, min, max) {
+  const maxed = num > max ? max : num;
+  return num < min ? min : maxed;
 };
 
-const reflect = function (reduction, position, speed) {
+const reflect = function(reduction, position, speed) {
   const sr = speed / reduction;
+  let retVal;
   if (position + sr <= -1.0 ||
       position + sr >= 1.0) {
     if (position - sr <= -1.0 ||
         position - sr >= 1.0) {
-      return [position, 0.0];
+      retVal = [position, 0.0];
     } else {
-      return [position - sr, -speed];
+      retVal = [position - sr, -speed];
     }
   } else {
-    return [position + sr, speed];
+    retVal = [position + sr, speed];
   }
+  return retVal;
 };
 
-const max = function (a, b) {
+const max = function(a, b) {
   return a > b ? a : b;
 };
 
-const min = function (a, b) {
+const min = function(a, b) {
   return a < b ? a : b;
 };
 
-const euclid = function (p1, p2) {
-  const
-    x = p2.x - p1.x,
-    y = p2.y - p1.y,
-    z = p2.z - p1.z,
-    distSquare = x * x + y * y + z * z,
-    ret = {
-      x: x,
-      y: y,
-      z: z,
-      distSquare: distSquare
-      //dist: Math.sqrt(distSquare)
-    };
+const euclid = function(p1, p2) {
+  const x = p2.x - p1.x;
+  const y = p2.y - p1.y;
+  const z = p2.z - p1.z;
+  const distSquare = x * x + y * y + z * z;
+  const ret = {
+    distSquare,
+    x: x,
+    y: y,
+    z: z,
+    dist: Math.sqrt(distSquare)
+  };
   return ret;
 };
 
-const updatePlanets = function () {
+const updatePlanets = function() {
   const vs = [];
   for (let p of window.planetsState.planets) {
     const ve = {
@@ -629,9 +619,6 @@ const updatePlanets = function () {
     const dist = diff.distSquare;
     let F = p1.mass * p2.mass * w;
     if (p1.isStar || p2.isStar) {
-      //F /= 100.0; //((1.0 + dist) * window.planetsConfig.starDistReduction);
-      //F = p1.parent.speed / speedReduction * dist / window.planetsConfig.starDistReduction;
-      //F = (p1.parent.speed / window.planetsConfig.speedReduction) * dist / window.planetsConfig.starDistReduction;
       F = 1.0 / (window.planetsConfig.minDist + dist) / window.planetsConfig.starDistReduction / window.planetsConfig.starCount;
     } else {
       F = 1.0 / (window.planetsConfig.minDist + dist) / window.planetsConfig.distReduction / window.planetsConfig.planetCount;
@@ -657,24 +644,23 @@ const updatePlanets = function () {
     planet.velocity.y += v.y;
     planet.velocity.z += v.z;
 
-    //if (!planet.isStar) {
-      const speed = Math.sqrt(planet.velocity.x * planet.velocity.x +
-                          planet.velocity.y * planet.velocity.y +
-                          planet.velocity.z * planet.velocity.z
-                         );
-      planet.speed = speed;
-      if (speed > window.planetsConfig.maxSpeed) {
-        planet.velocity.x *= (window.planetsConfig.maxSpeed / speed);
-        planet.velocity.y *= (window.planetsConfig.maxSpeed / speed);
-        planet.velocity.z *= (window.planetsConfig.maxSpeed / speed);
-        planet.speed = window.planetsConfig.maxSpeed;
-      } else if (speed < window.planetsConfig.minSpeed) {
-        planet.velocity.x *= (window.planetsConfig.minSpeed / speed);
-        planet.velocity.y *= (window.planetsConfig.minSpeed / speed);
-        planet.velocity.z *= (window.planetsConfig.minSpeed / speed);
-        planet.speed = window.planetsConfig.minSpeed;
-      }
-    //}
+    // limit speed
+    const speed = Math.sqrt(planet.velocity.x * planet.velocity.x +
+                        planet.velocity.y * planet.velocity.y +
+                        planet.velocity.z * planet.velocity.z
+                       );
+    planet.speed = speed;
+    if (speed > window.planetsConfig.maxSpeed) {
+      planet.velocity.x *= (window.planetsConfig.maxSpeed / speed);
+      planet.velocity.y *= (window.planetsConfig.maxSpeed / speed);
+      planet.velocity.z *= (window.planetsConfig.maxSpeed / speed);
+      planet.speed = window.planetsConfig.maxSpeed;
+    } else if (speed < window.planetsConfig.minSpeed) {
+      planet.velocity.x *= (window.planetsConfig.minSpeed / speed);
+      planet.velocity.y *= (window.planetsConfig.minSpeed / speed);
+      planet.velocity.z *= (window.planetsConfig.minSpeed / speed);
+      planet.speed = window.planetsConfig.minSpeed;
+    }
   }
 
   // update positions
@@ -699,7 +685,7 @@ const updatePlanets = function () {
   }
 };
 
-const Particles = function () {
+const Particles = function() {
   const geometry = new THREE.Geometry();
 
   const material =
@@ -714,27 +700,22 @@ const Particles = function () {
       },
       vertexShader: $('#vertexshaderParticles').text(),
       fragmentShader: $('#fragmentshaderParticles').text(),
-      //blending: THREE.AdditiveBlending,
-      //blending: THREE.MultiplyBlending,
+      // blending: THREE.AdditiveBlending,
+      // blending: THREE.MultiplyBlending,
       depthWrite: false,
       transparent: true
     });
-  //material = new THREE.PointCloudMaterial( { size: 35, sizeAttenuation: false, alphaTest: 0.5, transparent: true } );
+  // material = new THREE.PointCloudMaterial( { size: 35, sizeAttenuation: false, alphaTest: 0.5, transparent: true } );
   const particleCloud = new THREE.PointCloud(geometry, material);
 
-  this.setOpacity = function (o) {
+  this.setOpacity = function(o) {
     material.uniforms.opacity.value = o;
   };
 
-  this.add = function (pt, size, color, color2) {
+  this.add = function(pt, size, color, color2) {
     const vertices = geometry.vertices;
     const idx = vertices.length;
     vertices.push(pt);
-    /*} else {
-      geometry[currentIndex] = pt;
-      idx = currentIndex;
-      currentIndex = (currentIndex + 1) % maxParticles
-    }*/
     const vsize = material.attributes.psize.value;
     const vcolor = material.attributes.pcolor.value;
     const vcolor2 = material.attributes.pcolor2.value;
@@ -743,18 +724,18 @@ const Particles = function () {
     vcolor2[idx] = color2;
   };
 
-  this.addToScene = function (scene) {
+  this.addToScene = function(scene) {
     scene.add(particleCloud);
   };
 
-  this.removeFromScene = function (scene) {
+  this.removeFromScene = function(scene) {
     scene.remove(particleCloud);
     geometry.dispose();
     material.dispose();
   };
 };
 
-const BufferGeometry = function () {
+const BufferGeometry = function() {
   const geometry = new THREE.BufferGeometry();
 
   let length = 0;
@@ -767,7 +748,7 @@ const BufferGeometry = function () {
   });
   const mesh = new THREE.Line(geometry, material);
 
-  this.addPoint = function (pos) {
+  this.addPoint = function(pos) {
     const stepLength = Math.ceil(length / stepSize) * stepSize * 3;
     if (stepLength >= vertices.length) {
       const oldVertices = vertices;
@@ -787,17 +768,16 @@ const BufferGeometry = function () {
     length += 1;
   };
 
-  this.addToScene = function (scene) {
+  this.addToScene = function(scene) {
     scene.add(mesh);
   };
 };
 
-const RenderTool = function () {
+const RenderTool = function() {
   const oldTubes = [];
-  const oldParticles = [];
-  
+
   const scene = new THREE.Scene();
-  const camera= new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
   const screenScene = new THREE.Scene();
   const screenCamera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 0.1, 1000);
   const renderer = new THREE.WebGLRenderer();
@@ -813,11 +793,14 @@ const RenderTool = function () {
   let rtBackBuffer2;
   let rtScreen;
   let particles = new Particles();
+  let oldParticles = [];
 
-  const setup = function () {
+  const setup = function() {
     const gui = new dat.GUI();
     for (let varName in window.planetsConfig) {
-      gui.add(window.planetsConfig, varName);
+      if (window.planetsConfig.hasOwnProperty(varName)) {
+        gui.add(window.planetsConfig, varName);
+      }
     }
 
     camera.position.z = window.planetsConfig.scale;
@@ -844,7 +827,7 @@ const RenderTool = function () {
         uniforms: {
           backbuffer: { type: 't', value: rtBackBuffer1 },
           screen: { type: 't', value: rtScreen },
-          //planetsTexture: { type: 't', value: null },
+          // planetsTexture: { type: 't', value: null },
           resolution: { type: 'v2', value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
         },
         vertexShader: $('#vertexshader').text(),
@@ -861,22 +844,23 @@ const RenderTool = function () {
   };
   setup();
 
-  const mapPositionToScene = function (p, position) {
+  const mapPositionToScene = function(p, position) {
+    let newPos = position;
     if (p.isStar) {
-      position = {
+      newPos = {
         x: position.x * window.planetsConfig.starScale + p.parent.position.x,
         y: position.y * window.planetsConfig.starScale + p.parent.position.y,
         z: position.z * window.planetsConfig.starScale + p.parent.position.z
       };
     }
     return {
-      x: position.x * window.planetsConfig.maxX,
-      y: position.y * window.planetsConfig.maxY,
-      z: window.planetsConfig.useZ ? (position.z * window.planetsConfig.maxZ) : 0.0
+      x: newPos.x * window.planetsConfig.maxX,
+      y: newPos.y * window.planetsConfig.maxY,
+      z: window.planetsConfig.useZ ? (newPos.z * window.planetsConfig.maxZ) : 0.0
     };
   };
 
-  const createTube = function (p) {
+  const createTube = function(p) {
     const path = [];
     for (let pos of p.positions) {
       const pos2 = mapPositionToScene(p, pos);
@@ -899,7 +883,7 @@ const RenderTool = function () {
     oldTubes.push(tube);
   };
 
-  const updateMeshes = function (p, timeVal) {
+  const updateMeshes = function(p, timeVal) {
     const t = p.lastMesh;
     const mesh = p.meshes[t];
     if (mesh === undefined) {
@@ -916,9 +900,9 @@ const RenderTool = function () {
                 mesh.position.z + p.velocity.z);
     mesh.lookAt(dir);
 
-    const scale = 
+    const scale =
       window.planetsConfig.radiusScale *
-        (window.planetsConfig.usePlanetRadius ?  p.radius : 1.0);
+        (window.planetsConfig.usePlanetRadius ? p.radius : 1.0);
     mesh.scale.x = scale;
     mesh.scale.y = scale;
     mesh.scale.z = scale;
@@ -940,7 +924,7 @@ const RenderTool = function () {
     p.lastMesh = (p.lastMesh + 1) % p.meshes.length;
   };
 
-  this.render = function () {
+  this.render = function() {
     const firstRender = (renderCount === 0);
     renderCount += 1;
     const newTime = (new Date().getTime()) / 1000.0;
@@ -965,10 +949,7 @@ const RenderTool = function () {
     if (window.planetsConfig.useTubes) {
       for (let tube of oldTubes) {
         scene.remove(tube);
-        //tube.dispose();
         tube.geometry.dispose();
-        //material.dispose();
-        //texture.dispose();
       }
       oldTubes.length = 0;
     }
@@ -978,8 +959,8 @@ const RenderTool = function () {
         particles.removeFromScene(scene);
         for (let pt of oldParticles) {
           pt.removeFromScene(scene);
-          oldParticles.length = 0;
         }
+        oldParticles = [];
       } else {
         oldParticles.push(particles);
         let ptIndex = 0;
@@ -991,8 +972,9 @@ const RenderTool = function () {
           }
           ptIndex++;
         }
+        particles = new Particles();
+        particles.addToScene(scene);
       }
-      particles = new Particles();
     } else {
       if (oldConfig.useParticles) {
         particles.removeFromScene(scene);
@@ -1005,10 +987,10 @@ const RenderTool = function () {
         createTube(planet);
       }
       if (window.planetsConfig.useParticles) {
-        const size = 
+        const size =
           window.planetsConfig.radiusScale * 20.0 *
             (window.planetsConfig.usePlanetRadius ? planet.radius : 1.0);
-        const color = 
+        const color =
           (planet.isStar && window.planetsConfig.useParentColor) ?
             planet.parent.color : planet.color;
         if (planet.oldParticlePos !== undefined && window.planetsConfig.particleInterpolation > 0.0) {
@@ -1029,7 +1011,6 @@ const RenderTool = function () {
           }
         }
         particles.add(new THREE.Vector3(pos.x, pos.y, pos.z), size, color, planet.color2);
-        particles.addToScene(scene);
         planet.oldParticlePos = pos;
       }
       if (window.planetsConfig.useMeshes) {
@@ -1047,7 +1028,7 @@ const RenderTool = function () {
     // remove meshes when config says so
     if (!window.planetsConfig.useMeshes) {
       if (oldConfig.useMeshes) {
-        for (planet of window.planetsState.planets) {
+        for (let planet of window.planetsState.planets) {
           for (let mesh of planet.meshes) {
             scene.remove(mesh);
           }
@@ -1073,7 +1054,7 @@ const RenderTool = function () {
   };
 };
 
-const main = function () {
+const main = function() {
   window.planetsState = {
     planets: [],
     edges: [],
@@ -1103,7 +1084,6 @@ const main = function () {
     createPlanets();
     const computeShader = new ComputeShader(window.planetsState.planets);
     computeShader.compute();
-    window.renderCompute = () => computeShader.render();
   } else {
     createPlanets();
     createEdges();
