@@ -4,6 +4,8 @@ GLSL implementation of planets (N-body simulation)
 
 # Resources
 
+ - [Inspiration: Inigo Quilez' Worms - Looks better than mine](https://www.shadertoy.com/view/llXGR4)
+
 ## WebGL
 
  - [Three.js](http://threejs.org/)
