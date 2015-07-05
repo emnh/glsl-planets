@@ -450,7 +450,6 @@ void main( void ) {
                          gl_FragCoord.x / resolution.x *
                          gl_FragCoord.y / resolution.y +
                          time;
-            //vec2 v_texCoord = gl_FragCoord.xy / resolution;
 
             vec2 p =  v_texCoord * 8.0 - vec2(20.0);
             vec2 i = p;
@@ -546,16 +545,39 @@ precision highp float;
 
 uniform sampler2D texturePositions;
 attribute vec3 pcolor;
+attribute vec2 displacementIndex;
 varying vec3 vColor;
 varying vec3 vColor2;
 
 void main() {
-  vec3 planetPos = texture2D(texturePositions, position.xy).xyz;
+  vec3 planetPos = texture2D(texturePositions, displacementIndex).xyz;
   planetPos = (planetPos * 2.0) - 1.0;
+  planetPos += position.xyz;
   vColor = pcolor;
   vColor2 = pcolor;
 
   gl_PointSize = 25.0;
+
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(planetPos, 1.0);
+}
+
+</script>
+<script type="x-shader/x-vertex" id="vertexShaderFromPositionsGeo">
+#ifdef GL_ES
+precision highp float;
+#endif
+
+uniform sampler2D texturePositions;
+uniform vec2 udisplacementIndex;
+varying vec3 vNormal;
+varying vec3 texcoord;
+
+void main() {
+  vec3 planetPos = texture2D(texturePositions, udisplacementIndex).xyz;
+  planetPos = (planetPos * 2.0) - 1.0;
+  planetPos += position.xyz;
+  vNormal = normal;
+  texcoord = position * (0.3 / 0.01);
 
   gl_Position = projectionMatrix * modelViewMatrix * vec4(planetPos, 1.0);
 }

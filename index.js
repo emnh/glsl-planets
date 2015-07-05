@@ -45,7 +45,7 @@ const Config = function() {
 };
 window.planetsConfig = new Config();
 
-const gpgpuVersion = false;
+const gpgpuVersion = true;
 
 const ComputeShader = function() {
   const sq = Math.ceil(Math.sqrt(window.planetsState.planets.length));
@@ -141,14 +141,19 @@ const ComputeShader = function() {
     const controls = new THREE.OrbitControls(this.camera, compute.renderer.domElement);
 
     this.geometry = new THREE.Geometry();
+    
+    const sphere = new THREE.SphereGeometry( 0.01, 50, 50);
 
     this.material = new THREE.ShaderMaterial({
       uniforms: {
         texturePositions: { type: 't', value: null },
         opacity: { type: 'f', value: 1.0 },
-        resolution: { type: 'v2', value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+        resolution: { type: 'v2', value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+        udisplacementIndex: { type: 'v2', value: null, needsUpdate: true },
+        upcolor: { type: 'c', value: null, needsUpdate: true }
       },
       attributes: {
+        displacementIndex: { type: 'v2', value: [], needsUpdate: true },
         pcolor: { type: 'c', value: [], needsUpdate: true }
       },
       vertexShader: $('#vertexShaderFromPositions').text(),
@@ -158,27 +163,23 @@ const ComputeShader = function() {
       depthWrite: false
     });
 
-    const pColor = this.material.attributes.pcolor.value;
+    this.geoMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        texturePositions: { type: 't', value: null },
+        opacity: { type: 'f', value: 1.0 },
+        resolution: { type: 'v2', value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+        udisplacementIndex: { type: 'v2', value: null, needsUpdate: true },
+        color: { type: 'c', value: null, needsUpdate: true },
+        time: { type: 'f', value: 0.0, needsUpdate: true }
+      },
+      attributes: {
+      },
+      vertexShader: $('#vertexShaderFromPositionsGeo').text(),
+      fragmentShader: $('#fragmentshader2').text(),
+      transparent: false
+      //depthWrite: true
+    });
 
-    const vertices = this.geometry.vertices;
-    for (let x = 0; x < tw; x++) {
-      for (let y = 0; y < th; y++) {
-        const xf = x / tw;
-        const yf = y / th;
-        const pt = new THREE.Vector3(xf, yf, 0.0);
-        vertices.push(pt);
-        const r = Math.random();
-        const g = Math.random();
-        const b = Math.random();
-        const color = new THREE.Color(r, g, b);
-        pColor.push(color);
-      }
-    }
-
-    // const material = new THREE.PointCloudMaterial( { size: 1, sizeAttenuation: false, alphaTest: 0.5, transparent: true } );
-    this.particleCloud = new THREE.PointCloud(this.geometry, this.material);
-
-    const sphere = new THREE.SphereGeometry( 0.3, 50, 50);
     const smat = new THREE.MeshPhongMaterial({
       color: 0x2194ce,
       bumpScale: 1,
@@ -186,10 +187,54 @@ const ComputeShader = function() {
       shininess: 50,
       shading: THREE.SmoothShading
     });
+
+    const vertices = this.geometry.vertices;
+    const pColor = this.material.attributes.pcolor.value;
+    const displacementIndex = this.material.attributes.displacementIndex.value;
+
+    const materials = [];
+    this.materials = materials;
+    const meshes = []
+
+    for (let x = 0; x < tw; x++) {
+      for (let y = 0; y < th; y++) {
+        const xf = x / tw;
+        const yf = y / th;
+        const pt = new THREE.Vector2(xf, yf);
+        const r = Math.random();
+        const g = Math.random();
+        const b = Math.random();
+        const color = new THREE.Color(r, g, b);
+
+        if (window.planetsConfig.useMeshes) {
+          const material = this.geoMaterial.clone();
+          material.uniforms.udisplacementIndex.value = pt;
+          material.uniforms.color.value = color;
+          materials.push(material);
+          const mesh = new THREE.Mesh(sphere, material);
+          const scale = 1.0;
+          mesh.scale.x = scale;
+          mesh.scale.y = scale;
+          mesh.scale.z = scale;
+          meshes.push(mesh);
+          this.screenScene.add(mesh);
+        }
+        if (window.planetsConfig.useParticles) {
+          vertices.push(new THREE.Vector3(0.0, 0.0, 0.0));
+          displacementIndex.push(pt);
+          pColor.push(color);
+        }
+      }
+    }
+
+    // const material = new THREE.PointCloudMaterial( { size: 1, sizeAttenuation: false, alphaTest: 0.5, transparent: true } );
     const mesh = new THREE.Mesh(sphere, smat);
     // this.screenScene.add(mesh);
 
-    this.screenScene.add(this.particleCloud);
+    if (window.planetsConfig.useParticles) {
+      this.particleCloud = new THREE.PointCloud(this.geometry, this.material);
+      this.screenScene.add(this.particleCloud);
+    }
     this.screenScene.add(new THREE.AmbientLight(0x444444));
   }();
 
@@ -265,6 +310,13 @@ const ComputeShader = function() {
     // set input textures from last round
     this.uniforms.texturePositions.value = this.rtPositions2;
     this.uniforms.textureVelocities.value = this.rtVelocities2;
+    if (window.planetsConfig.useMeshes) {
+      const newTime = (new Date().getTime()) / 1000.0;
+      for (let material of this.screen.materials) {
+        material.uniforms.texturePositions.value = this.rtPositions2;
+        material.uniforms.time.value = newTime - window.planetsState.startTime;
+      }
+    }
 
     // update velocities
     this.mesh.material = this.velocityMaterial;
@@ -1081,6 +1133,8 @@ const main = function() {
     window.planetsConfig.starCount = 0;
     window.planetsConfig.trailLength = 0;
     window.planetsConfig.starTrailLength = 0;
+    window.planetsConfig.useParticles = true;
+    window.planetsConfig.useMeshes = false;
     createPlanets();
     const computeShader = new ComputeShader(window.planetsState.planets);
     computeShader.compute();
