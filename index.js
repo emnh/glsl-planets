@@ -11,7 +11,7 @@
 
 const Config = function() {
   this.planetCount = 5;
-  this.starCount = 0;
+  this.starCount = 25;
   this.maxSpeed = 1.00;
   this.minSpeed = 0.001;
   this.distReduction = 30;
@@ -774,6 +774,34 @@ const Particles = function() {
     vcolor2[idx] = color2;
   };
 
+  this.addPlanet = function(planet, pos) {
+    const size =
+      window.planetsConfig.radiusScale * 20.0 *
+        (window.planetsConfig.usePlanetRadius ? planet.radius : 1.0);
+    const color =
+      (planet.isStar && window.planetsConfig.useParentColor) ?
+        planet.parent.color : planet.color;
+    if (planet.oldParticlePos !== undefined && window.planetsConfig.particleInterpolation > 0.0) {
+      const p1 = planet.oldParticlePos;
+      const p2 = pos;
+      const diff = euclid(p1, p2);
+      const dist = diff.dist;
+      const maxI = window.planetsConfig.particleInterpolation * dist;
+      for (let i = 1; i <= maxI; i++) {
+        const scale = i / maxI;
+        const p3 = {
+          x: p1.x + diff.x * scale,
+          y: p1.y + diff.y * scale,
+          z: p1.z + diff.z * scale
+        };
+        const v3 = new THREE.Vector3(p3.x, p3.y, p3.z);
+        this.add(v3, size, color, planet.color2);
+      }
+    }
+    this.add(new THREE.Vector3(pos.x, pos.y, pos.z), size, color, planet.color2);
+    planet.oldParticlePos = pos;
+  }
+
   this.addToScene = function(scene) {
     scene.add(particleCloud);
   };
@@ -1041,31 +1069,7 @@ const RenderTool = function() {
         createTube(planet);
       }
       if (window.planetsConfig.useParticles) {
-        const size =
-          window.planetsConfig.radiusScale * 20.0 *
-            (window.planetsConfig.usePlanetRadius ? planet.radius : 1.0);
-        const color =
-          (planet.isStar && window.planetsConfig.useParentColor) ?
-            planet.parent.color : planet.color;
-        if (planet.oldParticlePos !== undefined && window.planetsConfig.particleInterpolation > 0.0) {
-          const p1 = planet.oldParticlePos;
-          const p2 = pos;
-          const diff = euclid(p1, p2);
-          const dist = diff.dist;
-          const maxI = window.planetsConfig.particleInterpolation * dist;
-          for (let i = 1; i <= maxI; i++) {
-            const scale = i / maxI;
-            const p3 = {
-              x: p1.x + diff.x * scale,
-              y: p1.y + diff.y * scale,
-              z: p1.z + diff.z * scale
-            };
-            const v3 = new THREE.Vector3(p3.x, p3.y, p3.z);
-            particles.add(v3, size, color, planet.color2);
-          }
-        }
-        particles.add(new THREE.Vector3(pos.x, pos.y, pos.z), size, color, planet.color2);
-        planet.oldParticlePos = pos;
+        particles.addPlanet(planet, pos);
       }
       if (window.planetsConfig.useMeshes) {
         updateMeshes(planet, timeVal);
