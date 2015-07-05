@@ -141,7 +141,7 @@ const ComputeShader = function() {
     const controls = new THREE.OrbitControls(this.camera, compute.renderer.domElement);
 
     this.geometry = new THREE.Geometry();
-    
+
     const sphere = new THREE.SphereGeometry( 0.01, 50, 50);
 
     this.material = new THREE.ShaderMaterial({
@@ -177,7 +177,6 @@ const ComputeShader = function() {
       vertexShader: $('#vertexShaderFromPositionsGeo').text(),
       fragmentShader: $('#fragmentshader2').text(),
       transparent: false
-      //depthWrite: true
     });
 
     const smat = new THREE.MeshPhongMaterial({
@@ -194,7 +193,7 @@ const ComputeShader = function() {
 
     const materials = [];
     this.materials = materials;
-    const meshes = []
+    const meshes = [];
 
     for (let x = 0; x < tw; x++) {
       for (let y = 0; y < th; y++) {
@@ -228,8 +227,6 @@ const ComputeShader = function() {
     }
 
     // const material = new THREE.PointCloudMaterial( { size: 1, sizeAttenuation: false, alphaTest: 0.5, transparent: true } );
-    const mesh = new THREE.Mesh(sphere, smat);
-    // this.screenScene.add(mesh);
 
     if (window.planetsConfig.useParticles) {
       this.particleCloud = new THREE.PointCloud(this.geometry, this.material);
