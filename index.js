@@ -11,7 +11,7 @@
 
 const Config = function() {
   this.planetCount = 5;
-  this.starCount = 25;
+  this.starCount = 0;
   this.maxSpeed = 1.00;
   this.minSpeed = 0.001;
   this.distReduction = 30;
@@ -19,7 +19,7 @@ const Config = function() {
   this.starDistReduction = 30;
   this.speedReduction = 100.0;
   this.starSpeedReduction = 0.1;
-  this.trailLength = 1;
+  this.trailLength = 100;
   this.starTrailLength = 1;
   this.randomWalk = false;
   this.randomWalkScale = 1.0;
@@ -45,7 +45,7 @@ const Config = function() {
 };
 window.planetsConfig = new Config();
 
-const gpgpuVersion = true;
+const gpgpuVersion = false;
 
 const ComputeShader = function() {
   const sq = Math.ceil(Math.sqrt(window.planetsState.planets.length));
@@ -514,6 +514,7 @@ const createPlanets = function() {
     window.planetsState.planets.push(planet);
     if (window.planetsConfig.useTubes) {
       planet.tubeMaterial = window.planetsState.meshMakers[planet.index % window.planetsState.meshMakers.length].shaderMaterial.clone();
+      //planet.tubeMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff });
     }
     for (let t = 0; t < window.planetsConfig.trailLength; t++) {
       const mesh = window.planetsState.meshMakers[planet.index % window.planetsState.meshMakers.length].createMesh();
@@ -713,24 +714,24 @@ const updatePlanets = function() {
   }
 
   // update positions
-  for (let planet2 of window.planetsState.planets) {
+  for (let planet of window.planetsState.planets) {
     // store old position
     if (window.planetsConfig.useTubes) {
-      planet2.positions.push({
-        x: planet2.position.x,
-        y: planet2.position.y,
-        z: planet2.position.z
+      planet.positions.push({
+        x: planet.position.x,
+        y: planet.position.y,
+        z: planet.position.z
       });
-      if (planet2.positions.length > planet2.maxPositions) {
-        planet2.positions.shift();
+      if (planet.positions.length > planet.maxPositions) {
+        planet.positions.shift();
       }
     }
 
     // compute new
-    const reduction = planet2.isStar ? window.planetsConfig.starSpeedReduction : window.planetsConfig.speedReduction;
-    [planet2.position.x, planet2.velocity.x] = reflect(reduction, planet2.position.x, planet2.velocity.x);
-    [planet2.position.y, planet2.velocity.y] = reflect(reduction, planet2.position.y, planet2.velocity.y);
-    [planet2.position.z, planet2.velocity.z] = reflect(reduction, planet2.position.z, planet2.velocity.z);
+    const reduction = planet.isStar ? window.planetsConfig.starSpeedReduction : window.planetsConfig.speedReduction;
+    [planet.position.x, planet.velocity.x] = reflect(reduction, planet.position.x, planet.velocity.x);
+    [planet.position.y, planet.velocity.y] = reflect(reduction, planet.position.y, planet.velocity.y);
+    [planet.position.z, planet.velocity.z] = reflect(reduction, planet.position.z, planet.velocity.z);
   }
 };
 
@@ -823,7 +824,6 @@ const BufferGeometry = function() {
 };
 
 const RenderTool = function() {
-  const oldTubes = [];
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -843,6 +843,7 @@ const RenderTool = function() {
   let rtScreen;
   let particles = new Particles();
   let oldParticles = [];
+  let oldTubes = [];
 
   const setup = function() {
     const gui = new dat.GUI();
@@ -1000,17 +1001,21 @@ const RenderTool = function() {
         scene.remove(tube);
         tube.geometry.dispose();
       }
-      oldTubes.length = 0;
+      oldTubes = [];
     }
-
-    if (window.planetsConfig.useParticles) {
-      if (!window.planetsConfig.useParticleTrail) {
+    
+    if ((!window.planetsConfig.useParticles && oldConfig.useParticles) || 
+        (!window.planetsConfig.useParticleTrail && oldConfig.useParticleTrail)) {
+      if (!window.planetsConfig.useParticles) {
         particles.removeFromScene(scene);
-        for (let pt of oldParticles) {
-          pt.removeFromScene(scene);
-        }
-        oldParticles = [];
-      } else {
+      }
+      for (let pt of oldParticles) {
+        pt.removeFromScene(scene);
+      }
+      oldParticles = [];
+    }
+    if (window.planetsConfig.useParticles) {
+      if (window.planetsConfig.useParticleTrail) {
         oldParticles.push(particles);
         let ptIndex = 0;
         for (let pt of oldParticles) {
@@ -1023,10 +1028,10 @@ const RenderTool = function() {
         }
         particles = new Particles();
         particles.addToScene(scene);
-      }
-    } else {
-      if (oldConfig.useParticles) {
+      } else {
         particles.removeFromScene(scene);
+        particles = new Particles();
+        particles.addToScene(scene);
       }
     }
 
