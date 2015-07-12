@@ -2,6 +2,10 @@
 
 GLSL implementation of planets (N-body simulation)
 
+# TODO
+
+ - Organize dat.GUI with folders
+
 # Resources
 
  - [Inspiration: Inigo Quilez' Worms - Looks better than mine](https://www.shadertoy.com/view/llXGR4)
